@@ -1,0 +1,651 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Playwright Revision Notes - Browser Context & Multi-Window Handling</title>
+<style>
+:root{--ink:#172033;--muted:#586579;--blue:#2457a7;--pale:#eef4ff;--green:#eaf7ef;--line:#d8e0ec;--yellow:#fff6d9;--red:#fff0ef}
+*{box-sizing:border-box}body{font-family:Arial,Helvetica,sans-serif;line-height:1.55;color:var(--ink);max-width:1050px;margin:0 auto;padding:28px;background:#f7f9fc}
+header{background:linear-gradient(120deg,#eaf1ff,#f4f0ff);padding:28px;border-radius:16px;border:1px solid var(--line);margin-bottom:22px}
+h1{margin:0 0 8px;font-size:30px;color:#183c78}h2{font-size:21px;color:#183c78;border-bottom:2px solid var(--line);padding-bottom:7px;margin-top:30px}
+h3{font-size:17px;color:#244b83;margin-bottom:6px}
+p{margin:8px 0} .sub{color:var(--muted)} .box{background:white;border:1px solid var(--line);border-radius:12px;padding:16px;margin:12px 0}
+.note{background:var(--yellow);border-left:4px solid #e2b532;padding:12px 15px;border-radius:8px;margin:12px 0}
+.good{background:var(--green);border-left:4px solid #3a9a60;padding:12px 15px;border-radius:8px;margin:12px 0}
+.bad{background:var(--red);border-left:4px solid #d45a55;padding:12px 15px;border-radius:8px;margin:12px 0}
+pre{background:#101b2d;color:#e8efff;padding:14px;border-radius:9px;overflow-x:auto;font-size:13px;line-height:1.5}
+code{font-family:Consolas,monospace}p code,li code,td code{background:#eef2f8;padding:2px 5px;border-radius:4px;color:#193e76}
+table{border-collapse:collapse;width:100%;margin:12px 0;background:white;font-size:14px}
+th,td{border:1px solid var(--line);padding:9px;text-align:left;vertical-align:top}
+th{background:var(--pale);color:#183c78}
+ul,ol{padding-left:23px}
+.grid{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.arch{text-align:center;background:#f2f6ff;border:1px solid #b8c9e8;padding:12px;border-radius:10px}
+.archchild{background:#eff9f2;border:1px solid #b9ddc4;padding:12px;border-radius:10px}
+footer{margin-top:35px;padding-top:15px;border-top:1px solid var(--line);color:var(--muted);font-size:13px}
+@media(max-width:650px){body{padding:14px}.grid{grid-template-columns:1fr}h1{font-size:24px}}
+@media print{body{background:white;max-width:none;padding:0}header,.box{break-inside:avoid}pre{white-space:pre-wrap;word-break:break-word}h2,h3{break-after:avoid}a{color:inherit}}
+</style>
+</head>
+<body>
+<header>
+<h1>Playwright Revision Notes</h1>
+<h2 style="border:0;margin:0;padding:0;color:#3e4d70">Browser Context & Multi-Window Handling</h2>
+<p class="sub">Practical reference • Important methods • Code patterns • Interview traps</p>
+</header>
+
+<h2>1. Browser → BrowserContext → Page</h2>
+<div class="box">
+ <div class="arch"><b>Browser</b><br><small>One browser instance</small></div>
+ <p style="text-align:center">↓</p>
+ <div class="grid">
+  <div class="archchild"><b>BrowserContext 1</b><br><small>Isolated session</small><hr>Page 1 (tab)<br>Page 2 (tab)</div>
+  <div class="archchild"><b>BrowserContext 2</b><br><small>Isolated session</small><hr>Page 3 (tab)<br>Page 4 (tab)</div>
+ </div>
+</div>
+<table><tr><th>Object</th><th>Simple meaning</th><th>Responsibility</th></tr>
+<tr><td>Browser</td><td>Browser instance</td><td>Runs the browser</td></tr>
+<tr><td>BrowserContext</td><td>Isolated browser session</td><td>Separate cookies and browser storage</td></tr>
+<tr><td>Page</td><td>Tab, popup or window</td><td>Displays a webpage</td></tr></table>
+<p><b>Memory hook:</b> Browser → Context → Page.</p>
+<p>A context is like a separate browser session. Logging in within Context 1 does not automatically log in Context 2.</p>
+
+<h2>2. Why use BrowserContext?</h2>
+<ul><li>Test multiple users independently.</li><li>Prevent one test's login state from affecting another.</li><li>Test roles such as Admin and Customer.</li><li>Handle multiple tabs and popups.</li><li>Reuse supported authentication state when needed.</li></ul>
+
+<h2>3. Important APIs – quick reference</h2>
+<table><tr><th>Method</th><th>Purpose</th><th>Async?</th></tr>
+<tr><td><code>browser.newContext()</code></td><td>Create a new context</td><td>Yes</td></tr>
+<tr><td><code>context.newPage()</code></td><td>Create a new page/tab</td><td>Yes</td></tr>
+<tr><td><code>context.pages()</code></td><td>Get currently open pages</td><td>No</td></tr>
+<tr><td><code>page.url()</code></td><td>Get current URL</td><td>No</td></tr>
+<tr><td><code>page.title()</code></td><td>Get page title</td><td>Yes</td></tr>
+<tr><td><code>page.close()</code></td><td>Close one page</td><td>Yes</td></tr>
+<tr><td><code>context.close()</code></td><td>Close context and its pages</td><td>Yes</td></tr>
+<tr><td><code>browser.close()</code></td><td>Close browser and contexts</td><td>Yes</td></tr>
+<tr><td><code>page.isClosed()</code></td><td>Check whether page is closed</td><td>No</td></tr>
+<tr><td><code>page.on("close", fn)</code></td><td>Listen for page closure</td><td>No</td></tr>
+<tr><td><code>page.waitForURL()</code></td><td>Wait for URL navigation</td><td>Yes</td></tr></table>
+<p><b>Note:</b> <code>context.pages()</code> returns a snapshot of pages open at the time you call it.</p>
+
+<h2>4. Creating contexts and pages</h2>
+<h3>Multiple pages in one context</h3>
+<pre><code>const context = await browser.newContext();
+
+const page1 = await context.newPage();
+const page2 = await context.newPage();
+const page3 = await context.newPage();</code></pre>
+<h3>Separate contexts</h3>
+<pre><code>const context1 = await browser.newContext();
+const context2 = await browser.newContext();
+
+const page1 = await context1.newPage();
+const page2 = await context2.newPage();</code></pre>
+<p>Pages in one context share context-level browser storage where the browser's storage rules allow it. Different contexts are isolated.</p>
+
+<h2>5. Popup, new tab and same-tab navigation</h2>
+<table><tr><th>Expected behaviour</th><th>Use</th></tr>
+<tr><td>Current page opens a popup/new tab</td><td><code>page.waitForEvent("popup")</code></td></tr>
+<tr><td>A new page appears anywhere in this context</td><td><code>context.waitForEvent("page")</code></td></tr>
+<tr><td>Current tab navigates to another URL</td><td><code>page.waitForURL()</code></td></tr></table>
+
+<h3>A. Capture a popup opened by the current page</h3>
+<pre><code>const [popup] = await Promise.all([
+  page.waitForEvent("popup"),
+  page.getByRole("link", { name: "Open Report" }).click()
+]);
+
+console.log(popup.url());</code></pre>
+<p>Listener is registered before the click action is triggered. <code>Promise.all()</code> waits for both promises.</p>
+
+<h3>B. Capture a new page anywhere in the context</h3>
+<pre><code>const [newPage] = await Promise.all([
+  context.waitForEvent("page"),
+  page.getByRole("button", { name: "Open Window" }).click()
+]);</code></pre>
+<p><code>context.waitForEvent("page")</code> waits for one new-page event. For repeated events, use <code>context.on("page", ...)</code>.</p>
+
+<h3>C. Register promise separately</h3>
+<pre><code>const popupPromise = page.waitForEvent("popup");
+
+await page.getByRole("link", { name: "Open Report" }).click();
+
+const popup = await popupPromise;</code></pre>
+
+<h3>D. Nested popups</h3>
+<pre><code>const reportPromise = page.waitForEvent("popup");
+await page.getByRole("link", { name: "Open Report" }).click();
+const reportPage = await reportPromise;
+
+const detailsPromise = reportPage.waitForEvent("popup");
+await reportPage.getByRole("link", { name: "Open Details" }).click();
+const detailsPage = await detailsPromise;</code></pre>
+<p><b>Memory hook:</b> Listen on the page that triggers the popup.</p>
+
+<h3>E. Capture multiple pages</h3>
+<pre><code>const newPages: Page[] = [];
+
+context.on("page", newPage => {
+  newPages.push(newPage);
+});
+
+await page.getByRole("button", { name: "Open Reports" }).click();
+
+await expect.poll(() => newPages.length).toBe(3);
+
+for (const newPage of newPages) {
+  console.log(newPage.url());
+  console.log(await newPage.title());
+}</code></pre>
+<p>Use a deterministic application condition and an appropriate timeout when waiting for a known number of pages.</p>
+
+<h2>6. Race condition</h2>
+<div class="bad"><b>Incorrect – listener registered too late</b>
+<pre><code>await page.getByRole("link", { name: "Report" }).click();
+const popup = await page.waitForEvent("popup");</code></pre>
+The popup might open before the listener starts. The event can be missed.</div>
+<div class="good"><b>Correct – listener before action</b>
+<pre><code>const [popup] = await Promise.all([
+  page.waitForEvent("popup"),
+  page.getByRole("link", { name: "Report" }).click()
+]);</code></pre>
+<b>Memory hook:</b> Listener first → Action second → Wait for completion.</div>
+
+<h2>7. Same-tab navigation</h2>
+<pre><code>await Promise.all([
+  page.waitForURL("**/dashboard"),
+  page.getByRole("link", { name: "Dashboard" }).click()
+]);
+
+// Alternative retrying assertion:
+await expect(page).toHaveURL(/dashboard/);</code></pre>
+<p><code>waitForURL()</code> waits for URL matching. <code>expect(page).toHaveURL()</code> is a retrying assertion. Neither alone guarantees that the required business UI is ready.</p>
+
+<h2>8. Page load vs element readiness</h2>
+<h3>Wait for a page load milestone</h3>
+<pre><code>await popup.waitForLoadState("load");</code></pre>
+<table><tr><th>State</th><th>Meaning</th></tr>
+<tr><td><code>commit</code></td><td>Navigation response received and document committed</td></tr>
+<tr><td><code>domcontentloaded</code></td><td>HTML parsed and DOMContentLoaded fired</td></tr>
+<tr><td><code>load</code></td><td>Page load event fired after dependent resources load</td></tr></table>
+<h3>Wait for the required UI element (often preferred)</h3>
+<pre><code>await expect(
+  popup.getByRole("heading", { name: "Order Details" })
+).toBeVisible({ timeout: 15000 });</code></pre>
+<div class="note"><b>Important:</b> <code>locator.isVisible()</code> checks current visibility; it does not auto-wait. <code>expect(locator).toBeVisible()</code> retries until visible or timeout. A page's load event does not mean all API data is ready.</div>
+<p>Avoid fixed waits such as <code>page.waitForTimeout(5000)</code> as a default. Prefer condition-based waits.</p>
+
+<h2>9. Find one or multiple pages</h2>
+<h3>Find one page using URL</h3>
+<pre><code>const pages = context.pages();
+
+const reportPage = pages.find(page =>
+  page.url().includes("/report")
+);
+
+if (reportPage && !reportPage.isClosed()) {
+  console.log(await reportPage.title());
+}</code></pre>
+<h3>Find multiple pages using a synchronous condition</h3>
+<pre><code>const reportPages = context.pages().filter(page =>
+  page.url().includes("/report")
+);</code></pre>
+<h3>Find pages using asynchronous titles</h3>
+<pre><code>for (const page of context.pages()) {
+  const title = await page.title();
+
+  if (title.includes("Report")) {
+    console.log(title);
+    await page.close();
+  }
+}</code></pre>
+<table><tr><th>Approach</th><th>Use</th></tr>
+<tr><td><code>find()</code></td><td>First matching item</td></tr>
+<tr><td><code>filter()</code></td><td>All matching items with a synchronous condition</td></tr>
+<tr><td><code>for...of</code></td><td>Process pages with <code>await</code></td></tr></table>
+<div class="bad"><b>Avoid:</b>
+<pre><code>pages.find(async page =>
+  (await page.title()).includes("Report")
+);</code></pre>
+<code>find()</code> does not wait for asynchronous callbacks.</div>
+
+<h2>10. Close pages safely</h2>
+<h3>Close one page</h3><pre><code>await page.close();</code></pre>
+<h3>Find and close one page by URL</h3>
+<pre><code>const openCartPage = context.pages().find(page =>
+  page.url().includes("/opencart/")
+);
+
+if (openCartPage && !openCartPage.isClosed()) {
+  await openCartPage.close();
+}</code></pre>
+<h3>Close all pages whose title matches</h3>
+<pre><code>for (const page of context.pages()) {
+  const title = await page.title();
+
+  if (title.includes("Report")) {
+    await page.close();
+  }
+}</code></pre>
+<table><tr><th>Method</th><th>Scope</th></tr>
+<tr><td><code>page.close()</code></td><td>One page</td></tr>
+<tr><td><code>context.close()</code></td><td>All pages in that context</td></tr>
+<tr><td><code>browser.close()</code></td><td>Browser and all its contexts</td></tr></table>
+
+<h2>11. Detect popup closure</h2>
+<pre><code>// Listen for a future close event
+popup.on("close", () => {
+  console.log("Popup closed");
+});
+
+// Check current state before interacting
+if (!popup.isClosed()) {
+  await popup.getByRole("button", { name: "Submit" }).click();
+}</code></pre>
+<p><code>on("close")</code> listens for a future event. <code>isClosed()</code> checks current state. Register listeners as early as possible.</p>
+
+<h2>12. Storage sharing and authentication</h2>
+<table><tr><th>Storage</th><th>Shared across pages in same context?</th></tr>
+<tr><td>Cookies</td><td>Yes, subject to cookie scope/rules</td></tr>
+<tr><td>localStorage</td><td>Yes, for the same origin</td></tr>
+<tr><td>sessionStorage</td><td>Generally separate per tab/top-level browsing context</td></tr></table>
+<h3>Reuse supported authentication state across contexts</h3>
+<pre><code>await context1.storageState({ path: "auth.json" });
+
+const context2 = await browser.newContext({
+  storageState: "auth.json"
+});</code></pre>
+<div class="note"><b>Important:</b> Storage state supports cookies and localStorage (and supported authentication state); it does not automatically save sessionStorage. SessionStorage behaviour may require a separate setup if the application depends on it.</div>
+
+<h2>13. Cleanup with try/finally</h2>
+<pre><code>test("Context cleanup", async ({ browser }) => {
+  const context = await browser.newContext();
+
+  try {
+    const page1 = await context.newPage();
+    const page2 = await context.newPage();
+
+    await page1.goto("https://example.com");
+
+    // Test execution
+  } finally {
+    await context.close();
+  }
+});</code></pre>
+<p><code>finally</code> runs whether the try block succeeds or throws. Close the resource you created. Playwright Test manages built-in fixtures such as <code>{ page }</code>, <code>{ context }</code> and <code>{ browser }</code>; do not close a shared fixture unnecessarily.</p>
+
+<h2>14. JavaScript async concepts used here</h2>
+<h3>Promise.all()</h3>
+<pre><code>const [popup] = await Promise.all([
+  page.waitForEvent("popup"),
+  page.getByRole("link", { name: "Report" }).click()
+]);</code></pre>
+<p>Starts the supplied promise operations and waits for all to fulfill. If one rejects, the combined Promise rejects; it does not automatically cancel the other operation.</p>
+<h3>forEach(async...) – common mistake</h3>
+<div class="bad"><pre><code>pages.forEach(async page => {
+  console.log(await page.title());
+});</code></pre>
+<code>forEach()</code> does not wait for async callbacks.</div>
+<h3>Sequential processing</h3>
+<pre><code>for (const page of pages) {
+  console.log(await page.title());
+}</code></pre>
+<h3>Parallel processing</h3>
+<pre><code>await Promise.all(
+  pages.map(async page => {
+    console.log(await page.title());
+  })
+);</code></pre>
+<table><tr><th>Requirement</th><th>Use</th></tr>
+<tr><td>One after another</td><td><code>for...of</code></td></tr>
+<tr><td>Concurrently</td><td><code>Promise.all(array.map(...))</code></td></tr>
+<tr><td>First matching item</td><td><code>find()</code></td></tr>
+<tr><td>All matching items</td><td><code>filter()</code></td></tr></table>
+
+<h2>15. URL matching patterns</h2>
+<pre><code>// Exact URL
+await page.waitForURL("https://example.com/dashboard");
+
+// Glob pattern
+await page.waitForURL("**/dashboard");
+
+// Regular expression
+await page.waitForURL(/dashboard/);
+
+// Function
+await page.waitForURL(url =>
+  url.pathname.includes("dashboard")
+);</code></pre>
+<p>For redirects, generally wait for the final expected URL. URL matching alone does not prove the business UI is ready.</p>
+
+<h2>16. Quick interview Q&amp;A</h2>
+<table><tr><th>Question</th><th>Quick answer</th></tr>
+<tr><td>Browser vs Context vs Page?</td><td>Instance vs isolated session vs tab.</td></tr>
+<tr><td>Capture a popup?</td><td><code>page.waitForEvent("popup")</code>.</td></tr>
+<tr><td>Capture a new page anywhere in context?</td><td><code>context.waitForEvent("page")</code>.</td></tr>
+<tr><td>Same-tab navigation?</td><td><code>page.waitForURL()</code>.</td></tr>
+<tr><td>Get all open pages?</td><td><code>context.pages()</code>.</td></tr>
+<tr><td>Find one page?</td><td><code>find()</code>.</td></tr>
+<tr><td>Find multiple pages?</td><td><code>filter()</code> or <code>for...of</code>.</td></tr>
+<tr><td>Why not async inside find?</td><td><code>find()</code> does not await callbacks.</td></tr>
+<tr><td>Get page title?</td><td><code>await page.title()</code>.</td></tr>
+<tr><td>Get current URL?</td><td><code>page.url()</code>.</td></tr>
+<tr><td>Check if closed?</td><td><code>page.isClosed()</code>.</td></tr>
+<tr><td>Listen for close?</td><td><code>page.on("close", callback)</code>.</td></tr>
+<tr><td>Close one tab?</td><td><code>page.close()</code>.</td></tr>
+<tr><td>Close one context?</td><td><code>context.close()</code>.</td></tr>
+<tr><td>Reuse login state?</td><td><code>storageState()</code> for supported state.</td></tr>
+<tr><td>Does load mean API data is ready?</td><td>No. Wait for the required UI condition.</td></tr>
+<tr><td>Cleanup after failure?</td><td><code>try/finally</code>.</td></tr></table>
+
+<h2>17. Common mistakes – last-minute revision</h2>
+<ul>
+<li>Registering popup listener after click → can miss event.</li>
+<li>Using popup event for same-tab navigation → use <code>waitForURL()</code>.</li>
+<li>Using page popup listener for unrelated pages → consider context page event.</li>
+<li>Using <code>find(async...)</code> → callback is not awaited.</li>
+<li>Using <code>forEach(async...)</code> → outer code does not wait.</li>
+<li>Assuming page load means UI is ready → assert the required element.</li>
+<li>Using <code>isVisible()</code> as an auto-wait → use <code>expect().toBeVisible()</code>.</li>
+<li>Closing browser when only one context should close → use <code>context.close()</code>.</li>
+<li>Assuming sessionStorage is shared → generally separate per tab.</li>
+<li>Using fixed waits everywhere → prefer condition-based waits.</li>
+</ul>
+
+<h2>18. Final revision checklist</h2>
+<p>Tick each item only after you can explain it or write the code without looking.</p>
+<div class="box">
+<label><input type="checkbox"> Explain Browser → Context → Page hierarchy.</label><br>
+<label><input type="checkbox"> Create two isolated browser contexts.</label><br>
+<label><input type="checkbox"> Create multiple pages in one context.</label><br>
+<label><input type="checkbox"> Capture a popup using page.waitForEvent().</label><br>
+<label><input type="checkbox"> Capture a new page using context.waitForEvent().</label><br>
+<label><input type="checkbox"> Capture multiple pages using context.on().</label><br>
+<label><input type="checkbox"> Handle same-tab navigation using waitForURL().</label><br>
+<label><input type="checkbox"> Find a page using its URL.</label><br>
+<label><input type="checkbox"> Find pages using asynchronous titles.</label><br>
+<label><input type="checkbox"> Close one page without affecting others.</label><br>
+<label><input type="checkbox"> Detect when a popup closes.</label><br>
+<label><input type="checkbox"> Explain cookie, localStorage and sessionStorage sharing.</label><br>
+<label><input type="checkbox"> Reuse authentication using storageState().</label><br>
+<label><input type="checkbox"> Wait for UI elements instead of fixed timeouts.</label><br>
+<label><input type="checkbox"> Use try/finally for cleanup.</label><br>
+<label><input type="checkbox"> Explain Promise.all(), find(), filter() and for...of.</label>
+</div>
+
+<div class="good"><b>10-second mental map</b><br>
+Browser → Context → Page<br>
+New tab → popup<br>
+Any new context page → context page event<br>
+Same tab → waitForURL()<br>
+All pages → context.pages()<br>
+One match → find()<br>
+Multiple matches → filter() / for...of<br>
+One tab close → page.close()<br>
+All context tabs close → context.close()<br>
+UI readiness → expect().toBeVisible()<br>
+Cleanup → finally</div>
+
+
+<h2 id="assignments">19. Practical assignments – real-time implementation & interview preparation</h2>
+<p>Complete these in order. Build them in your own Playwright + TypeScript project. Use the Playwright Test runner, meaningful test names, reliable locators, assertions, and proper cleanup. Do not copy a solution first: implement, run, debug, and then review.</p>
+
+<div class="note"><b>How to practise each assignment</b><br>
+1. Read the requirement and write the test yourself.<br>
+2. Run it at least twice to check reliability.<br>
+3. Intentionally introduce one failure and observe the error.<br>
+4. Remove fixed waits and use event-based or condition-based waiting.<br>
+5. Explain why your approach works, as if answering a Senior SDET interviewer.</div>
+
+<h3>Level 1 – Core browser and context skills</h3>
+<div class="box">
+<b>Assignment 1 – Two isolated user sessions</b>
+<p><b>Scenario:</b> An application supports Admin and Standard User accounts. Verify that their browser sessions are independent.</p>
+<ul>
+<li>Create two BrowserContexts from one Browser.</li>
+<li>Open the same application in both contexts.</li>
+<li>Log in as Admin in Context 1 and as Standard User in Context 2.</li>
+<li>Verify the correct user identity or role in each page.</li>
+<li>Verify that logging out in Context 1 does not log out Context 2.</li>
+</ul>
+<p><b>Acceptance criteria:</b> Two contexts are created; each has its own login state; the test proves isolation with assertions.</p>
+<p><b>Skills:</b> <code>browser.newContext()</code>, <code>context.newPage()</code>, cookies, authentication, assertions.</p>
+</div>
+
+<div class="box">
+<b>Assignment 2 – Multiple tabs in one context</b>
+<p><b>Scenario:</b> An agent works with a customer record and an order record in separate tabs.</p>
+<ul>
+<li>Create one context and open three pages.</li>
+<li>Navigate each page to a different application route.</li>
+<li>Use <code>context.pages()</code> to retrieve all open pages.</li>
+<li>Assert that exactly three pages are open.</li>
+<li>Identify the customer page by URL and verify a customer-specific heading.</li>
+</ul>
+<p><b>Acceptance criteria:</b> Do not depend on page array indexes to identify the customer page.</p>
+<p><b>Skills:</b> <code>context.pages()</code>, <code>page.url()</code>, <code>find()</code>, locator assertions.</p>
+</div>
+
+<div class="box">
+<b>Assignment 3 – Close only the matching page</b>
+<p><b>Scenario:</b> A workflow opens several tabs, but a report tab must be closed while the others remain available.</p>
+<ul>
+<li>Open at least four pages in one context.</li>
+<li>Identify the page whose URL contains a chosen route such as <code>/report</code>.</li>
+<li>Close only that page.</li>
+<li>Assert that the other pages remain open and the page count decreases by one.</li>
+<li>Handle the case where no matching page exists.</li>
+</ul>
+<p><b>Acceptance criteria:</b> No broad <code>context.close()</code> or <code>browser.close()</code> is used to close one tab.</p>
+<p><b>Skills:</b> <code>find()</code>, <code>isClosed()</code>, <code>page.close()</code>, page-count assertions.</p>
+</div>
+
+<h3>Level 2 – Popup, navigation and event handling</h3>
+<div class="box">
+<b>Assignment 4 – Capture a popup and validate its content</b>
+<p><b>Scenario:</b> Clicking “Open Invoice” launches an invoice in a new tab.</p>
+<ul>
+<li>Register the popup listener before clicking.</li>
+<li>Capture the popup using <code>page.waitForEvent("popup")</code>.</li>
+<li>Wait for the expected invoice URL.</li>
+<li>Assert the invoice heading, invoice number, and one key detail.</li>
+<li>Take a screenshot of the popup if the assertion fails (optional enhancement).</li>
+</ul>
+<p><b>Acceptance criteria:</b> No race condition; validate both navigation and business content.</p>
+<p><b>Skills:</b> <code>waitForEvent("popup")</code>, <code>Promise.all()</code>, <code>waitForURL()</code>, <code>expect()</code>.</p>
+</div>
+
+<div class="box">
+<b>Assignment 5 – Same-tab navigation (not a popup)</b>
+<p><b>Scenario:</b> Clicking “Dashboard” navigates the current tab to the dashboard route.</p>
+<ul>
+<li>Wait for the expected URL while clicking the link.</li>
+<li>Assert that the current page URL matches the dashboard.</li>
+<li>Assert that the dashboard heading or main landmark is visible.</li>
+<li>Explain why waiting for a popup would be incorrect.</li>
+</ul>
+<p><b>Acceptance criteria:</b> Use the existing Page object; do not expect a new Page to be created.</p>
+<p><b>Skills:</b> <code>page.waitForURL()</code>, <code>toHaveURL()</code>, locator readiness.</p>
+</div>
+
+<div class="box">
+<b>Assignment 6 – Capture a page created anywhere in the context</b>
+<p><b>Scenario:</b> A toolbar action opens a new page, but the page that triggers it may vary.</p>
+<ul>
+<li>Register <code>context.waitForEvent("page")</code> before the action.</li>
+<li>Trigger the action from a page.</li>
+<li>Assert the new page's expected URL and title or heading.</li>
+<li>Explain when this context-level event is more suitable than a page-level popup event.</li>
+</ul>
+<p><b>Acceptance criteria:</b> Correct event scope; listener registered before action.</p>
+<p><b>Skills:</b> <code>context.waitForEvent("page")</code>, event ordering, URL/title checks.</p>
+</div>
+
+<div class="box">
+<b>Assignment 7 – Multiple popups from one action</b>
+<p><b>Scenario:</b> Clicking “Open batch reports” opens three report pages.</p>
+<ul>
+<li>Register <code>context.on("page", ...)</code> before clicking.</li>
+<li>Collect the new Page objects in an array.</li>
+<li>Wait for the expected number of pages using a condition-based wait.</li>
+<li>Validate each page by URL or heading.</li>
+<li>Close only the pages created by this action.</li>
+</ul>
+<p><b>Acceptance criteria:</b> Capture all expected pages, not just the first event. Avoid arbitrary sleeps.</p>
+<p><b>Skills:</b> <code>context.on("page")</code>, arrays, <code>expect.poll()</code>, cleanup.</p>
+</div>
+
+<h3>Level 3 – Readiness, storage and robust automation</h3>
+<div class="box">
+<b>Assignment 8 – Popup loads slowly</b>
+<p><b>Scenario:</b> The popup appears quickly, but its content loads after an API response.</p>
+<ul>
+<li>Capture the popup.</li>
+<li>Wait for a meaningful business element, not just the page load event.</li>
+<li>Use a retrying assertion with a sensible timeout.</li>
+<li>Explain the difference between <code>load</code> and application readiness.</li>
+<li>Do not use <code>waitForTimeout()</code> as the solution.</li>
+</ul>
+<p><b>Acceptance criteria:</b> The test waits for the actual element required by the next action.</p>
+<p><b>Skills:</b> <code>waitForLoadState()</code>, <code>expect().toBeVisible()</code>, timeouts, dynamic UI.</p>
+</div>
+
+<div class="box">
+<b>Assignment 9 – Authentication state reuse</b>
+<p><b>Scenario:</b> A login flow is expensive, and later tests need to start already authenticated.</p>
+<ul>
+<li>Log in using a setup step or setup test.</li>
+<li>Save state using <code>context.storageState({ path: "auth.json" })</code>.</li>
+<li>Create a fresh context using that storage state.</li>
+<li>Verify that the new context is authenticated.</li>
+<li>Document whether the application relies on cookies, localStorage, or sessionStorage.</li>
+</ul>
+<p><b>Acceptance criteria:</b> Demonstrate reuse in a separate context; do not claim storageState automatically persists sessionStorage.</p>
+<p><b>Skills:</b> <code>storageState()</code>, context isolation, authentication setup.</p>
+</div>
+
+<div class="box">
+<b>Assignment 10 – Popup closes unexpectedly</b>
+<p><b>Scenario:</b> A popup may close after a user action or application response.</p>
+<ul>
+<li>Register a <code>close</code> listener as soon as you have the popup reference.</li>
+<li>Record that the close event occurred.</li>
+<li>Before a later action, check <code>isClosed()</code>.</li>
+<li>Handle the closed-page path without trying to interact with a closed page.</li>
+</ul>
+<p><b>Acceptance criteria:</b> Distinguish between listening for a future close and checking current state.</p>
+<p><b>Skills:</b> <code>page.on("close")</code>, <code>page.isClosed()</code>, defensive checks.</p>
+</div>
+
+<div class="box">
+<b>Assignment 11 – Reliable cleanup after failure</b>
+<p><b>Scenario:</b> A test creates a manual context and fails halfway through.</p>
+<ul>
+<li>Create a context and at least two pages inside a <code>try</code> block.</li>
+<li>Force an assertion failure temporarily.</li>
+<li>Use <code>finally</code> to close the manually created context.</li>
+<li>Run the test and verify cleanup still happens after failure.</li>
+<li>Explain why you should not close a Playwright Test fixture browser unnecessarily.</li>
+</ul>
+<p><b>Acceptance criteria:</b> Cleanup runs on both pass and fail paths; only the owned context is closed.</p>
+<p><b>Skills:</b> <code>try/finally</code>, fixture lifecycle, context cleanup.</p>
+</div>
+
+<h3>Level 4 – Senior SDET interview challenges</h3>
+<div class="box">
+<b>Assignment 12 – Build a reusable popup helper</b>
+<p><b>Scenario:</b> Several tests need to click a control and capture the popup it opens.</p>
+<ul>
+<li>Create a reusable TypeScript helper that accepts the parent Page and a click action or locator.</li>
+<li>Register the popup event before triggering the action.</li>
+<li>Return the captured Page to the test.</li>
+<li>Use the helper in at least two tests.</li>
+<li>Keep the helper typed and avoid using <code>any</code>.</li>
+</ul>
+<p><b>Acceptance criteria:</b> Reusable, readable helper; event listener is never registered after the action.</p>
+<p><b>Skills:</b> TypeScript types, async functions, Promise, reusable test utilities.</p>
+</div>
+
+<div class="box">
+<b>Assignment 13 – Identify pages by business meaning, not array position</b>
+<p><b>Scenario:</b> A workflow opens a customer page, an order page and a report page in an unpredictable order.</p>
+<ul>
+<li>Open all three pages.</li>
+<li>Identify each page using a stable URL fragment or page-specific heading.</li>
+<li>Do not assume <code>context.pages()[0]</code> is always the customer page.</li>
+<li>Handle a missing page explicitly and produce a useful failure message.</li>
+</ul>
+<p><b>Acceptance criteria:</b> Reliable identification even if opening order changes.</p>
+<p><b>Skills:</b> Page collections, URL matching, async title checks, defensive assertions.</p>
+</div>
+
+<div class="box">
+<b>Assignment 14 – Diagnose a flaky multi-window test</b>
+<p><b>Scenario:</b> A test passes locally but intermittently times out in CI while waiting for a popup or heading.</p>
+<ul>
+<li>Review event registration order.</li>
+<li>Check whether the action opens a popup or navigates the same page.</li>
+<li>Check whether the popup is created but navigates later.</li>
+<li>Check whether the expected element is delayed, missing, or incorrectly located.</li>
+<li>Replace fixed waits with the correct event and condition-based assertion.</li>
+<li>Add useful logs such as page URL and title when diagnosing.</li>
+</ul>
+<p><b>Acceptance criteria:</b> Explain the root cause and fix, not just increase every timeout.</p>
+<p><b>Skills:</b> Debugging, race conditions, navigation lifecycle, CI reliability.</p>
+</div>
+
+<div class="box">
+<b>Assignment 15 – End-to-end multi-window workflow</b>
+<p><b>Scenario:</b> An operations user logs in, opens an order, opens an invoice popup, verifies invoice data, opens a report in another tab, then closes the report and logs out.</p>
+<ol>
+<li>Create the appropriate context and page.</li>
+<li>Log in and assert the authenticated user.</li>
+<li>Open the order and assert its details.</li>
+<li>Capture the invoice popup and wait for the invoice content.</li>
+<li>Open the report page and identify it by URL or title.</li>
+<li>Close only the report page and verify the order and invoice pages remain open.</li>
+<li>Log out and clean up the context in <code>finally</code>.</li>
+</ol>
+<p><b>Acceptance criteria:</b> The complete flow is stable, uses no arbitrary fixed waits, has meaningful assertions, and cleans up correctly even on failure.</p>
+<p><b>Skills:</b> Integration of the full module; realistic multi-window workflow; test design.</p>
+</div>
+
+<h3>Assignment completion tracker</h3>
+<p>Mark an assignment complete only after it passes reliably and you can explain the key design decision without looking at the notes.</p>
+<div class="box">
+<label><input type="checkbox"> Assignment 1 – Two isolated user sessions</label><br>
+<label><input type="checkbox"> Assignment 2 – Multiple tabs in one context</label><br>
+<label><input type="checkbox"> Assignment 3 – Close only the matching page</label><br>
+<label><input type="checkbox"> Assignment 4 – Capture popup and validate content</label><br>
+<label><input type="checkbox"> Assignment 5 – Same-tab navigation</label><br>
+<label><input type="checkbox"> Assignment 6 – Capture page anywhere in context</label><br>
+<label><input type="checkbox"> Assignment 7 – Capture multiple pages</label><br>
+<label><input type="checkbox"> Assignment 8 – Wait for slow popup content</label><br>
+<label><input type="checkbox"> Assignment 9 – Reuse authentication state</label><br>
+<label><input type="checkbox"> Assignment 10 – Handle popup closure</label><br>
+<label><input type="checkbox"> Assignment 11 – Cleanup after failure</label><br>
+<label><input type="checkbox"> Assignment 12 – Reusable popup helper</label><br>
+<label><input type="checkbox"> Assignment 13 – Identify pages by business meaning</label><br>
+<label><input type="checkbox"> Assignment 14 – Diagnose flaky multi-window test</label><br>
+<label><input type="checkbox"> Assignment 15 – End-to-end multi-window workflow</label><br>
+</div>
+
+<h3>What should you be able to do before the interview?</h3>
+<ul>
+<li>Write the popup and same-tab navigation patterns without notes.</li>
+<li>Explain why the listener must be registered before the action.</li>
+<li>Choose correctly between page-level and context-level page events.</li>
+<li>Find and close one or many pages safely.</li>
+<li>Explain context isolation and storage-state limitations accurately.</li>
+<li>Wait for business UI readiness rather than relying on page load or fixed sleeps.</li>
+<li>Use typed helpers and reliable cleanup.</li>
+<li>Debug a flaky popup test by finding the actual cause.</li>
+</ul>
+<div class="good"><b>Suggested practice order:</b> Assignments 1–3 build the foundation; 4–7 cover event handling; 8–11 cover reliability; 12–15 prepare you to explain and design solutions at Senior SDET level. Complete and review them in order rather than rushing through all 15.</div>
+
+<footer>
+Prepared as a practical revision reference for Playwright with TypeScript. Verify selectors and expected URLs against the application under test. Examples assume Playwright Test and the relevant fixtures/imports are available.
+</footer>
+</body>
+</html>

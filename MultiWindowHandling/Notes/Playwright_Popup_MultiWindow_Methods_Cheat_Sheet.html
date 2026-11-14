@@ -1,0 +1,201 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Playwright Popup & Multi-Window Methods Cheat Sheet</title>
+<style>
+:root{--ink:#172033;--muted:#5d687b;--line:#dce2eb;--soft:#f5f7fb;--blue:#3157c8;--green:#16834a}
+*{box-sizing:border-box}body{margin:0;background:#f3f5f9;color:var(--ink);font:15px/1.55 Arial,Helvetica,sans-serif}
+main{max-width:1050px;margin:28px auto;padding:0 18px 42px}
+header,.panel{background:#fff;border:1px solid var(--line);border-radius:14px;padding:22px;margin-bottom:16px}
+header{box-shadow:0 4px 18px #1423460d}h1{font-size:clamp(25px,4vw,34px);line-height:1.2;margin:0 0 8px}
+h2{font-size:20px;margin:0 0 12px}p{margin:7px 0}.muted{color:var(--muted)}
+table{width:100%;border-collapse:collapse;margin-top:8px}
+th,td{text-align:left;vertical-align:top;padding:10px 9px;border-bottom:1px solid #edf0f5}
+th{background:var(--soft);font-size:13px;color:#39445a}
+td:first-child{width:29%;font-weight:600}td:nth-child(2){width:49%}td:last-child{width:22%;white-space:nowrap;color:#34466e}
+code{background:#f0f3f8;padding:2px 5px;border-radius:5px;font-family:Consolas,monospace;font-size:.93em}
+.tag{display:inline-block;background:#eef2ff;color:#34466e;border-radius:20px;padding:3px 8px;font-size:11px;margin-left:5px}
+.callout{background:#f0f6ff;border:1px solid #d8e5ff;border-radius:9px;padding:12px 14px;margin-top:12px}
+pre{background:#111827;color:#edf2f7;padding:15px;border-radius:10px;overflow-x:auto;font:13px/1.6 Consolas,monospace}
+.actions{margin-top:14px}button{border:1px solid var(--line);background:#fff;border-radius:8px;padding:9px 13px;font-weight:600;cursor:pointer}
+ul{margin:8px 0;padding-left:22px}
+footer{text-align:center;color:var(--muted);font-size:13px;padding:12px}
+@media(max-width:700px){table,tbody,tr,td{display:block;width:100%}thead{display:none}tr{padding:8px 0;border-bottom:1px solid var(--line)}td{border:0;padding:3px 5px}td:first-child,td:nth-child(2),td:last-child{width:100%;white-space:normal}td:first-child:before{content:"Method: ";color:var(--muted);font-weight:400}td:nth-child(2):before{content:"Usage: ";color:var(--muted)}td:last-child:before{content:"Return type: ";color:var(--muted)}}
+@media print{body{background:#fff}main{margin:0;max-width:none}.panel,header{break-inside:avoid;box-shadow:none}button{display:none}pre{white-space:pre-wrap}}
+</style>
+</head>
+<body>
+<main>
+<header>
+<h1>Playwright Popup & Multi-Window Handling</h1>
+<p class="muted">Important TypeScript methods · One-line usage · Return types</p>
+<p>A practical reference for popup capture, tabs/pages, navigation, assertions and cleanup. Use the return type to understand what each method gives back.</p>
+<div class="actions"><button onclick="window.print()">Print / Save as PDF</button></div>
+</header>
+
+<section class="panel">
+<h2>1. Browser, BrowserContext and Page hierarchy <span class="tag">Foundation</span></h2>
+<table><thead><tr><th>Method</th><th>One-line usage</th><th>Return type</th></tr></thead><tbody>
+<tr><td><code>browser.newContext()</code></td><td>Create an isolated browser session.</td><td><code>Promise&lt;BrowserContext&gt;</code></td></tr>
+<tr><td><code>browser.contexts()</code></td><td>Get all browser contexts currently open in this browser.</td><td><code>BrowserContext[]</code></td></tr>
+<tr><td><code>browser.close()</code></td><td>Close the browser and its contexts/pages.</td><td><code>Promise&lt;void&gt;</code></td></tr>
+<tr><td><code>context.newPage()</code></td><td>Create a new page inside this context.</td><td><code>Promise&lt;Page&gt;</code></td></tr>
+<tr><td><code>context.pages()</code></td><td>Get all currently open pages in this context.</td><td><code>Page[]</code></td></tr>
+<tr><td><code>context.close()</code></td><td>Close this context and all its pages.</td><td><code>Promise&lt;void&gt;</code></td></tr>
+<tr><td><code>page.context()</code></td><td>Get the BrowserContext that owns this page.</td><td><code>BrowserContext</code></td></tr>
+</tbody></table>
+</section>
+
+<section class="panel">
+<h2>2. Popup and new-page capturing <span class="tag">Core interview APIs</span></h2>
+<table><thead><tr><th>Method</th><th>One-line usage</th><th>Return type</th></tr></thead><tbody>
+<tr><td><code>page.waitForEvent("popup")</code></td><td>Wait for a popup opened by the current page.</td><td><code>Promise&lt;Page&gt;</code></td></tr>
+<tr><td><code>context.waitForEvent("page")</code></td><td>Wait for a new page opened anywhere in this context.</td><td><code>Promise&lt;Page&gt;</code></td></tr>
+<tr><td><code>page.on("popup", handler)</code></td><td>Listen continuously for popups opened by this page.</td><td><code>void</code></td></tr>
+<tr><td><code>context.on("page", handler)</code></td><td>Listen continuously for new pages in this context.</td><td><code>void</code></td></tr>
+<tr><td><code>page.once("popup", handler)</code></td><td>Listen for only the next popup event.</td><td><code>void</code></td></tr>
+<tr><td><code>popup.opener()</code></td><td>Get the page that opened this popup, if available.</td><td><code>Promise&lt;Page | null&gt;</code></td></tr>
+</tbody></table>
+<div class="callout"><strong>Choose the right API:</strong><br>
+<code>page.waitForEvent("popup")</code> = popup from the current page.<br>
+<code>context.waitForEvent("page")</code> = a new page anywhere in the context.<br>
+<code>context.on("page")</code> = continuously monitor new pages.</div>
+</section>
+
+<section class="panel">
+<h2>3. Capture popup and click together</h2>
+<table><thead><tr><th>Method</th><th>One-line usage</th><th>Return type</th></tr></thead><tbody>
+<tr><td><code>Promise.all()</code></td><td>Wait for the popup event and perform the click together.</td><td><code>Promise&lt;Array / tuple&gt;</code></td></tr>
+</tbody></table>
+<pre>const [popup] = await Promise.all([
+  page.waitForEvent("popup"),
+  page.getByRole("button", { name: "Open Window" }).click()
+]);</pre>
+<p class="muted">The first promise registers the popup wait before the click starts. The captured <code>popup</code> is a <code>Page</code> object.</p>
+</section>
+
+<section class="panel">
+<h2>4. Popup navigation and page information</h2>
+<table><thead><tr><th>Method</th><th>One-line usage</th><th>Return type</th></tr></thead><tbody>
+<tr><td><code>popup.url()</code></td><td>Get the popup's current URL.</td><td><code>string</code></td></tr>
+<tr><td><code>popup.title()</code></td><td>Get the popup's current document title.</td><td><code>Promise&lt;string&gt;</code></td></tr>
+<tr><td><code>popup.waitForURL()</code></td><td>Wait until this popup reaches the expected URL.</td><td><code>Promise&lt;void&gt;</code></td></tr>
+<tr><td><code>popup.waitForLoadState()</code></td><td>Wait for a page load state such as <code>domcontentloaded</code> or <code>load</code>.</td><td><code>Promise&lt;void&gt;</code></td></tr>
+<tr><td><code>popup.isClosed()</code></td><td>Check whether the popup is currently closed.</td><td><code>boolean</code></td></tr>
+</tbody></table>
+<pre>await popup.waitForURL("**/invoice");
+console.log(popup.url());
+
+const title = await popup.title();</pre>
+</section>
+
+<section class="panel">
+<h2>5. Find and identify pages</h2>
+<table><thead><tr><th>Method</th><th>One-line usage</th><th>Return type</th></tr></thead><tbody>
+<tr><td><code>context.pages()</code></td><td>Get an array of currently open pages.</td><td><code>Page[]</code></td></tr>
+<tr><td><code>pages.find()</code></td><td>Find the first page matching a synchronous condition, such as URL.</td><td><code>Page | undefined</code></td></tr>
+<tr><td><code>page.url()</code></td><td>Read the current page URL.</td><td><code>string</code></td></tr>
+<tr><td><code>page.title()</code></td><td>Read the current page title asynchronously.</td><td><code>Promise&lt;string&gt;</code></td></tr>
+</tbody></table>
+<pre>// Find by URL
+const invoicePage = context.pages().find(
+  p => p.url().includes("/invoices")
+);
+
+// Find by title: title() is asynchronous, so use for...of
+let pageWithInvoiceTitle;
+for (const p of context.pages()) {
+  if ((await p.title()).includes("Invoice")) {
+    pageWithInvoiceTitle = p;
+    break;
+  }
+}</pre>
+<p class="muted">Important: <code>find()</code> does not wait for async callbacks. Use <code>for...of</code> when checking an async method such as <code>page.title()</code>.</p>
+</section>
+
+<section class="panel">
+<h2>6. Interact with elements inside a popup</h2>
+<table><thead><tr><th>Method</th><th>One-line usage</th><th>Return type</th></tr></thead><tbody>
+<tr><td><code>popup.locator()</code></td><td>Find an element using a CSS/XPath or other locator selector.</td><td><code>Locator</code></td></tr>
+<tr><td><code>popup.getByRole()</code></td><td>Find an element by accessible role and optional name.</td><td><code>Locator</code></td></tr>
+<tr><td><code>popup.getByText()</code></td><td>Find an element by text.</td><td><code>Locator</code></td></tr>
+<tr><td><code>popup.getByLabel()</code></td><td>Find a form control by its associated label.</td><td><code>Locator</code></td></tr>
+<tr><td><code>locator.click()</code></td><td>Click the located element.</td><td><code>Promise&lt;void&gt;</code></td></tr>
+<tr><td><code>locator.fill()</code></td><td>Fill a text input or textarea.</td><td><code>Promise&lt;void&gt;</code></td></tr>
+<tr><td><code>locator.isVisible()</code></td><td>Immediately check the locator's current visibility.</td><td><code>Promise&lt;boolean&gt;</code></td></tr>
+</tbody></table>
+<p class="muted">Use the popup Page object to find and interact with popup elements, for example <code>popup.getByRole(...)</code>, not the original page object.</p>
+</section>
+
+<section class="panel">
+<h2>7. Waits and assertions inside popups</h2>
+<table><thead><tr><th>Method</th><th>One-line usage</th><th>Return type</th></tr></thead><tbody>
+<tr><td><code>locator.waitFor()</code></td><td>Wait for locator state: attached, detached, visible or hidden.</td><td><code>Promise&lt;void&gt;</code></td></tr>
+<tr><td><code>expect(locator).toBeVisible()</code></td><td>Retry until the element is visible.</td><td><code>Promise&lt;void&gt;</code></td></tr>
+<tr><td><code>expect(locator).toBeHidden()</code></td><td>Retry until the element is hidden or detached.</td><td><code>Promise&lt;void&gt;</code></td></tr>
+<tr><td><code>expect(locator).toHaveText()</code></td><td>Retry until the element has the expected text.</td><td><code>Promise&lt;void&gt;</code></td></tr>
+<tr><td><code>expect(locator).toHaveValue()</code></td><td>Retry until an input has the expected value.</td><td><code>Promise&lt;void&gt;</code></td></tr>
+<tr><td><code>expect(locator).toBeEnabled()</code></td><td>Retry until the element is enabled.</td><td><code>Promise&lt;void&gt;</code></td></tr>
+<tr><td><code>expect(popup).toHaveTitle()</code></td><td>Retry until the page title matches.</td><td><code>Promise&lt;void&gt;</code></td></tr>
+<tr><td><code>expect(popup).toHaveURL()</code></td><td>Retry until the page URL matches.</td><td><code>Promise&lt;void&gt;</code></td></tr>
+</tbody></table>
+<div class="callout"><strong>Remember:</strong> Actions such as <code>locator.click()</code> have built-in actionability auto-waiting. Use web-first assertions when you need to verify that a UI state eventually becomes true.</div>
+</section>
+
+<section class="panel">
+<h2>8. Closing pages and cleanup</h2>
+<table><thead><tr><th>Method</th><th>One-line usage</th><th>Return type</th></tr></thead><tbody>
+<tr><td><code>popup.close()</code></td><td>Close only the popup page.</td><td><code>Promise&lt;void&gt;</code></td></tr>
+<tr><td><code>page.close()</code></td><td>Close one specific page.</td><td><code>Promise&lt;void&gt;</code></td></tr>
+<tr><td><code>context.close()</code></td><td>Close all pages belonging to this context.</td><td><code>Promise&lt;void&gt;</code></td></tr>
+<tr><td><code>browser.close()</code></td><td>Close the browser and all its contexts/pages.</td><td><code>Promise&lt;void&gt;</code></td></tr>
+<tr><td><code>page.isClosed()</code></td><td>Check whether the page is already closed.</td><td><code>boolean</code></td></tr>
+<tr><td><code>page.on("close", handler)</code></td><td>Listen for the page's close event.</td><td><code>void</code></td></tr>
+</tbody></table>
+</section>
+
+<section class="panel">
+<h2>9. Important interview distinctions</h2>
+<ul>
+<li><strong>New tab/new window vs new context:</strong> A popup opened through normal browser popup behavior is generally a new <code>Page</code> in the same context. A separate browser process/context is a different case.</li>
+<li><strong><code>page.waitForEvent("popup")</code> vs <code>context.waitForEvent("page")</code>:</strong> Popup from the current page vs a new page anywhere in the context.</li>
+<li><strong><code>page.url()</code> vs <code>page.title()</code>:</strong> URL is synchronous; title is asynchronous.</li>
+<li><strong><code>context.pages()</code> vs <code>browser.contexts()</code>:</strong> Pages in one context vs contexts in one browser.</li>
+<li><strong><code>page.close()</code> vs <code>context.close()</code>:</strong> Close one page vs close all pages in one context.</li>
+<li><strong><code>context.close()</code> vs <code>browser.close()</code>:</strong> Close one session vs close the browser.</li>
+<li><strong><code>page.isClosed()</code> vs <code>page.on("close")</code>:</strong> Check current state vs listen for a close event.</li>
+<li><strong><code>waitForURL()</code> vs <code>expect(page).toHaveURL()</code>:</strong> Wait for a URL condition vs make a retrying URL assertion.</li>
+</ul>
+</section>
+
+<section class="panel">
+<h2>10. Quick mental map</h2>
+<pre>CAPTURE
+  page.waitForEvent("popup")
+  context.waitForEvent("page")
+
+GET PAGES
+  context.pages()
+  pages.find(...)
+
+INSPECT
+  popup.url()
+  await popup.title()
+
+WAIT / VERIFY
+  popup.waitForURL(...)
+  expect(popup).toHaveTitle(...)
+  expect(popup.getByRole(...)).toBeVisible()
+
+CLOSE
+  popup.close()
+  context.close()
+  browser.close()</pre>
+<p class="muted">Scope: This reference covers popup, multi-page, UI synchronization and cleanup methods. API/network synchronization is intentionally excluded.</p>
+</section>
+<footer>Playwright Popup & Multi-Window Handling · TypeScript quick reference</footer>
+</main>
+</body>
+</html>

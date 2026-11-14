@@ -1,0 +1,119 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Playwright Popup Handling — End-to-End Topic Checklist</title>
+<style>
+:root{--ink:#172033;--muted:#5e687b;--line:#dce2eb;--soft:#f5f7fb;--accent:#3157c8;--green:#16834a}
+*{box-sizing:border-box}body{margin:0;background:#f3f5f9;color:var(--ink);font:15px/1.55 Arial,sans-serif}
+main{max-width:1000px;margin:28px auto;padding:0 18px 40px}
+header,.group,.summary{background:#fff;border:1px solid var(--line);border-radius:14px;padding:22px;margin-bottom:16px}
+header{box-shadow:0 4px 18px #1423460d}h1{font-size:clamp(25px,4vw,34px);line-height:1.2;margin:0 0 8px}
+h2{font-size:20px;margin:0 0 12px}h3{font-size:16px;margin:18px 0 8px}
+.muted{color:var(--muted)}.intro{max-width:800px}
+.stats{display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin-top:18px}
+.stat{background:var(--soft);border:1px solid var(--line);border-radius:9px;padding:8px 12px;min-width:100px}
+.stat strong{display:block;font-size:21px}.progress{height:10px;background:#e7ebf2;border-radius:20px;overflow:hidden;flex:1;min-width:150px}
+.bar{height:100%;width:0;background:var(--green);transition:width .2s}
+.topic{display:flex;gap:10px;align-items:flex-start;padding:9px 0;border-top:1px solid #edf0f5}
+.topic:first-of-type{border-top:0}input{width:18px;height:18px;margin:3px 0 0;accent-color:var(--green);flex:none}
+label{flex:1;cursor:pointer}.topic.done label{color:#7b8493;text-decoration:line-through}
+.subtopics{color:var(--muted);font-size:13px;margin-top:2px}
+.pill{display:inline-block;font-size:11px;background:#eef2ff;color:#34466e;border-radius:20px;padding:3px 8px;margin-left:6px;vertical-align:2px}
+button{border:1px solid var(--line);background:#fff;border-radius:8px;padding:9px 12px;font-weight:600;cursor:pointer;margin:10px 6px 0 0}
+.callout{background:#f0f6ff;border:1px solid #d8e5ff;border-radius:9px;padding:12px 14px}
+@media print{body{background:#fff}main{margin:0}.progress,button{display:none}.group,header,.summary{break-inside:avoid;box-shadow:none}}
+</style>
+</head>
+<body><main>
+<header>
+<h1>Playwright Popup Handling — End-to-End Topic Checklist</h1>
+<p class="muted">A learning index of concepts and subtopics to master for practical work and Senior SDET interviews.</p>
+<p class="intro">This is a <strong>topic checklist</strong>, not an assignment list. Work through the concepts in sequence. Tick a topic only when you can explain it, choose the correct API, and implement it independently in TypeScript.</p>
+<div class="stats">
+<div class="stat"><strong id="done">0</strong><span class="muted">Topics mastered</span></div>
+<div class="stat"><strong id="remaining">0</strong><span class="muted">Remaining</span></div>
+<div class="progress"><div class="bar" id="bar"></div></div>
+<div class="stat"><strong id="percent">0%</strong><span class="muted">Progress</span></div>
+</div>
+<button onclick="window.print()">Print checklist</button><button onclick="resetChecklist()">Reset progress</button>
+</header>
+
+<section class="group"><h2>1. Browser, context, page and popup fundamentals <span class="pill">Foundation</span></h2>
+<div class="topic"><input id="t1" type="checkbox"><label for="t1"><strong>Browser → BrowserContext → Page hierarchy</strong><div class="subtopics">What each object represents; where pages/tabs belong; one browser with multiple isolated contexts; multiple pages within one context.</div></label></div>
+<div class="topic"><input id="t2" type="checkbox"><label for="t2"><strong>What is a popup?</strong><div class="subtopics">New tab vs new window; popup as a new Page; how a popup relates to its opener; popup versus same-tab navigation.</div></label></div>
+<div class="topic"><input id="t3" type="checkbox"><label for="t3"><strong>What creates a new Page?</strong><div class="subtopics">User action such as target=_blank, window.open(), links/buttons; pages created directly through the context; distinguish app behavior from Playwright API behavior.</div></label></div>
+<div class="topic"><input id="t4" type="checkbox"><label for="t4"><strong>Popup ownership and scope</strong><div class="subtopics">Page-level popup belongs to its opener; context-level page event catches pages opened anywhere in that context; pages in another context are separate.</div></label></div>
+</section>
+
+<section class="group"><h2>2. Capturing popups and new pages <span class="pill">Core APIs</span></h2>
+<div class="topic"><input id="t5" type="checkbox"><label for="t5"><strong><code>page.waitForEvent("popup")</code></strong><div class="subtopics">Capture a popup opened by the current page; return value is a Page object; use the captured popup for later interactions.</div></label></div>
+<div class="topic"><input id="t6" type="checkbox"><label for="t6"><strong><code>context.waitForEvent("page")</code></strong><div class="subtopics">Capture a new page opened anywhere in the browser context; understand when it is more suitable than page-level popup capture.</div></label></div>
+<div class="topic"><input id="t7" type="checkbox"><label for="t7"><strong><code>context.on("page", handler)</code></strong><div class="subtopics">Continuously listen for new pages; collect multiple pages; difference between event listener and one-time wait.</div></label></div>
+<div class="topic"><input id="t8" type="checkbox"><label for="t8"><strong>Register event listener before the triggering action</strong><div class="subtopics">Why waiting after clicking can miss a fast popup; event promise pattern; correct ordering.</div></label></div>
+<div class="topic"><input id="t9" type="checkbox"><label for="t9"><strong><code>Promise.all()</code> for popup capture and click</strong><div class="subtopics">Wait promise plus click promise; await the combined result; understand which promise resolves to the popup Page.</div></label></div>
+<div class="topic"><input id="t10" type="checkbox"><label for="t10"><strong>Choosing the right capture mechanism</strong><div class="subtopics"><code>page.waitForEvent("popup")</code> vs <code>context.waitForEvent("page")</code> vs <code>context.on("page")</code>; decision based on scope and whether one or many pages are expected.</div></label></div>
+</section>
+
+<section class="group"><h2>3. Working inside a popup <span class="pill">Interaction</span></h2>
+<div class="topic"><input id="t11" type="checkbox"><label for="t11"><strong>Popup is a normal Page object</strong><div class="subtopics">Use locators, click, fill, selectOption, check, assertions and other Page/Locator APIs on the popup.</div></label></div>
+<div class="topic"><input id="t12" type="checkbox"><label for="t12"><strong>Locate elements inside the correct page</strong><div class="subtopics">Use <code>popup.getByRole()</code>, <code>popup.getByText()</code>, <code>popup.locator()</code>; avoid accidentally using the original page's locators.</div></label></div>
+<div class="topic"><input id="t13" type="checkbox"><label for="t13"><strong>Popup URL and title</strong><div class="subtopics"><code>popup.url()</code> is synchronous; <code>await popup.title()</code> is asynchronous; assertions with <code>toHaveURL()</code> and <code>toHaveTitle()</code>.</div></label></div>
+<div class="topic"><input id="t14" type="checkbox"><label for="t14"><strong>Popup opens at <code>about:blank</code></strong><div class="subtopics">Capture first, then wait for navigation on the popup itself; handle delayed redirect/navigation; do not wait on the opener for popup navigation.</div></label></div>
+<div class="topic"><input id="t15" type="checkbox"><label for="t15"><strong>Popup page load versus application readiness</strong><div class="subtopics">Load states are not proof that dynamic data is ready; wait for the actual heading, status, form or other meaningful UI condition.</div></label></div>
+</section>
+
+<section class="group"><h2>4. Multiple tabs and page identification <span class="pill">Page management</span></h2>
+<div class="topic"><input id="t16" type="checkbox"><label for="t16"><strong><code>context.pages()</code></strong><div class="subtopics">Returns currently open pages in the context; understand it is a snapshot array and call again to see later pages.</div></label></div>
+<div class="topic"><input id="t17" type="checkbox"><label for="t17"><strong>Identify a page by URL</strong><div class="subtopics"><code>page.url()</code>; use <code>find()</code> to locate a matching Page; handle no match safely.</div></label></div>
+<div class="topic"><input id="t18" type="checkbox"><label for="t18"><strong>Identify a page by title</strong><div class="subtopics"><code>await page.title()</code>; use an async <code>for...of</code> loop; understand why <code>find(async ...)</code> is not suitable.</div></label></div>
+<div class="topic"><input id="t19" type="checkbox"><label for="t19"><strong>Handle multiple popups</strong><div class="subtopics">Capture popups independently; map each page to its purpose; avoid assuming the newest page is always the correct one.</div></label></div>
+<div class="topic"><input id="t20" type="checkbox"><label for="t20"><strong>Nested popups</strong><div class="subtopics">A popup opens another popup; listen on the page that triggers the next popup; maintain references to both pages.</div></label></div>
+</section>
+
+<section class="group"><h2>5. Navigation and synchronization in popup workflows <span class="pill">Waits</span></h2>
+<div class="topic"><input id="t21" type="checkbox"><label for="t21"><strong><code>popup.waitForURL()</code></strong><div class="subtopics">Wait for popup navigation; URL patterns and glob matching; call it on the page whose URL changes.</div></label></div>
+<div class="topic"><input id="t22" type="checkbox"><label for="t22"><strong><code>popup.waitForLoadState()</code></strong><div class="subtopics">Understand <code>domcontentloaded</code>, <code>load</code> and <code>networkidle</code>; valid spelling/case; when load-state waits are and are not useful.</div></label></div>
+<div class="topic"><input id="t23" type="checkbox"><label for="t23"><strong>Web-first assertions inside popups</strong><div class="subtopics"><code>toBeVisible()</code>, <code>toBeHidden()</code>, <code>toHaveText()</code>, <code>toHaveValue()</code>, <code>toBeEnabled()</code>, <code>toHaveTitle()</code>, <code>toHaveURL()</code>.</div></label></div>
+<div class="topic"><input id="t24" type="checkbox"><label for="t24"><strong>Locator wait versus assertion</strong><div class="subtopics"><code>locator.waitFor()</code> supported states: attached, detached, visible, hidden; assertions retry and verify expected UI state.</div></label></div>
+<div class="topic"><input id="t25" type="checkbox"><label for="t25"><strong>Auto-waiting and actionability</strong><div class="subtopics">Before click: attached, visible, stable, enabled and receives events; overlays can block clicks; avoid redundant manual waits.</div></label></div>
+<div class="topic"><input id="t26" type="checkbox"><label for="t26"><strong>Fixed waits and timeout handling</strong><div class="subtopics">Why <code>waitForTimeout()</code> is usually discouraged; per-wait timeout options; what a timeout failure means and how to diagnose it.</div></label></div>
+</section>
+
+<section class="group"><h2>6. Page lifecycle, closing and cleanup <span class="pill">Reliability</span></h2>
+<div class="topic"><input id="t27" type="checkbox"><label for="t27"><strong><code>page.isClosed()</code></strong><div class="subtopics">Check whether a Page is currently closed; boolean result; it does not wait for a page to close.</div></label></div>
+<div class="topic"><input id="t28" type="checkbox"><label for="t28"><strong><code>page.on("close")</code> and close events</strong><div class="subtopics">Listen for a page closing; difference between an event listener and checking current state.</div></label></div>
+<div class="topic"><input id="t29" type="checkbox"><label for="t29"><strong><code>page.close()</code></strong><div class="subtopics">Close one page only; other pages in the same context remain open.</div></label></div>
+<div class="topic"><input id="t30" type="checkbox"><label for="t30"><strong><code>context.close()</code> versus <code>browser.close()</code></strong><div class="subtopics">Close all pages in one context versus shut down the browser and its contexts; understand scope and test isolation.</div></label></div>
+<div class="topic"><input id="t31" type="checkbox"><label for="t31"><strong>Reliable cleanup with <code>try...finally</code></strong><div class="subtopics">Ensure context/page cleanup even when assertions or actions fail; avoid closing a shared browser unexpectedly.</div></label></div>
+</section>
+
+<section class="group"><h2>7. Popup-related browser events and tricky cases <span class="pill">Interview depth</span></h2>
+<div class="topic"><input id="t32" type="checkbox"><label for="t32"><strong>One-time event waits versus continuous listeners</strong><div class="subtopics"><code>waitForEvent()</code>, <code>once()</code> and <code>on()</code>; choose based on whether one event or ongoing observation is needed.</div></label></div>
+<div class="topic"><input id="t33" type="checkbox"><label for="t33"><strong>Popup blocked, delayed or not created</strong><div class="subtopics">Timeout behavior; check click action, browser/app behavior and event registration order; avoid treating a timeout as proof of a specific root cause.</div></label></div>
+<div class="topic"><input id="t34" type="checkbox"><label for="t34"><strong>Popup closes itself or closes unexpectedly</strong><div class="subtopics">Handle page lifecycle safely; check <code>isClosed()</code>; understand errors from interacting with a closed page.</div></label></div>
+<div class="topic"><input id="t35" type="checkbox"><label for="t35"><strong>Same-tab navigation versus new page</strong><div class="subtopics">Use <code>waitForURL()</code> for same-page navigation; use popup/page events when a new Page is created.</div></label></div>
+<div class="topic"><input id="t36" type="checkbox"><label for="t36"><strong>Common popup automation mistakes</strong><div class="subtopics">Waiting after click; listening on the wrong page/context; interacting with the opener instead of popup; assuming load means data ready; forgetting cleanup.</div></label></div>
+</section>
+
+<section class="group"><h2>8. End-to-end implementation and interview readiness <span class="pill">Mastery</span></h2>
+<div class="topic"><input id="t37" type="checkbox"><label for="t37"><strong>Complete popup workflow</strong><div class="subtopics">Open popup → capture it → wait for URL/UI → interact → assert results → close popup → verify opener remains usable.</div></label></div>
+<div class="topic"><input id="t38" type="checkbox"><label for="t38"><strong>Salesforce-style business workflow</strong><div class="subtopics">Customer details popup → open invoice popup → validate customer/account/invoice details → close invoice → continue in customer popup.</div></label></div>
+<div class="topic"><input id="t39" type="checkbox"><label for="t39"><strong>Explain API selection in an interview</strong><div class="subtopics">Justify page-level versus context-level capture; explain event ordering, assertions, lifecycle and cleanup choices.</div></label></div>
+<div class="topic"><input id="t40" type="checkbox"><label for="t40"><strong>Debug a flaky popup test</strong><div class="subtopics">Diagnose race conditions, wrong page references, URL timing, slow UI rendering, overlays, premature closure and missing cleanup.</div></label></div>
+</section>
+
+<section class="summary"><h2>Definition of done</h2>
+<p>Consider this topic mastered when you can explain the mental model, select the correct API without guessing, write the TypeScript code independently, and troubleshoot a failing popup workflow.</p>
+<p class="callout"><strong>Scope:</strong> This index is focused on end-to-end popup and multi-page handling. It includes the UI synchronization concepts needed to work with popups. It intentionally does not include API/network testing topics.</p>
+</section>
+</main>
+<script>
+const boxes=[...document.querySelectorAll('input[type=checkbox]')];
+function update(){const n=boxes.filter(b=>b.checked).length;document.getElementById('done').textContent=n;document.getElementById('remaining').textContent=boxes.length-n;document.getElementById('percent').textContent=Math.round(n/boxes.length*100)+'%';document.getElementById('bar').style.width=(n/boxes.length*100)+'%';boxes.forEach(b=>b.closest('.topic').classList.toggle('done',b.checked));try{localStorage.setItem('pw-popup-topics-v1',JSON.stringify(boxes.map(b=>b.checked)))}catch(e){}}
+function resetChecklist(){if(confirm('Reset all topic progress?')){boxes.forEach(b=>b.checked=false);update()}}
+try{const saved=JSON.parse(localStorage.getItem('pw-popup-topics-v1')||'[]');boxes.forEach((b,i)=>b.checked=!!saved[i])}catch(e){}
+boxes.forEach(b=>b.addEventListener('change',update));update();
+</script>
+</body></html>

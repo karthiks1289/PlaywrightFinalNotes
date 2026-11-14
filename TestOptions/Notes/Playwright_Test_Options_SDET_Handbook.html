@@ -1,0 +1,430 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Playwright Test Options — SDET Training Handbook</title>
+<style>
+:root{--ink:#172033;--muted:#5b6475;--line:#dce2ec;--soft:#f4f7fb;--blue:#174ea6;--bluebg:#eaf2ff;--green:#176b45;--greenbg:#e9f7ef;--amber:#815400;--amberbg:#fff5dc;--code:#101827}
+*{box-sizing:border-box}body{margin:0;background:#eef2f7;color:var(--ink);font:16px/1.62 system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif}
+.wrap{max-width:1050px;margin:28px auto;padding:0 18px}.sheet{background:white;border:1px solid var(--line);border-radius:18px;padding:clamp(22px,4vw,48px);box-shadow:0 8px 30px #14213d0c}
+h1{font-size:2.25rem;line-height:1.15;margin:0 0 12px}h2{font-size:1.55rem;margin:42px 0 14px;padding-bottom:8px;border-bottom:2px solid var(--line)}h3{font-size:1.15rem;margin:25px 0 8px}h4{margin:18px 0 6px}
+p{margin:8px 0 14px}.muted{color:var(--muted)}.eyebrow{font-size:.8rem;font-weight:800;letter-spacing:.12em;color:var(--blue);text-transform:uppercase}
+.lead{font-size:1.12rem;color:#344055}.callout{padding:14px 17px;border-left:4px solid var(--blue);background:var(--bluebg);border-radius:8px;margin:16px 0}.warning{background:var(--amberbg);border-left-color:#c28a12}.success{background:var(--greenbg);border-left-color:#258456}
+.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:12px;margin:16px 0}.tile{border:1px solid var(--line);border-radius:12px;padding:14px;background:#fff}.tile b{display:block;margin-bottom:4px}
+table{border-collapse:collapse;width:100%;margin:14px 0 22px;font-size:.94rem}th,td{border:1px solid var(--line);padding:9px 11px;text-align:left;vertical-align:top}th{background:var(--soft)}code{font-family:Consolas,Monaco,monospace;background:#f0f3f8;padding:2px 5px;border-radius:4px;font-size:.92em}pre{background:var(--code);color:#e7edf7;padding:17px;border-radius:11px;overflow:auto;font:13.5px/1.55 Consolas,Monaco,monospace}pre code{background:none;color:inherit;padding:0}
+ul,ol{padding-left:24px}li{margin:5px 0}.mental{border:1px solid var(--line);background:var(--soft);border-radius:12px;padding:16px;margin:14px 0}.mental .step{display:inline-block;background:white;border:1px solid var(--line);border-radius:8px;padding:8px 11px;margin:4px;font-weight:650}
+.small{font-size:.88rem}.tag{display:inline-block;background:var(--bluebg);color:var(--blue);border-radius:999px;padding:2px 9px;font-size:.78rem;font-weight:750}.toc a{color:var(--blue);text-decoration:none}.toc li{margin:3px 0}
+.qa{padding:13px 0;border-bottom:1px solid var(--line)}.qa b{display:block}.answer{color:#3e4a5e;margin-top:5px}
+.footer{margin-top:40px;padding-top:18px;border-top:1px solid var(--line);color:var(--muted);font-size:.88rem}
+@media print{body{background:white}.wrap{max-width:none;margin:0;padding:0}.sheet{border:0;box-shadow:none;border-radius:0;padding:10mm}h2{break-after:avoid}pre,table,.callout{break-inside:avoid}a{color:inherit;text-decoration:none}}
+</style>
+</head>
+<body><main class="wrap"><article class="sheet">
+<div class="eyebrow">Senior SDET learning notes • TypeScript</div>
+<h1>Playwright Test Options</h1>
+<p class="lead">End-to-end training handbook: what each option controls, where it belongs, when to use it, practical examples, common mistakes, interview questions and assignments.</p>
+<div class="callout"><b>Accuracy note</b><br>These notes are checked against the official Playwright documentation available on 13 November 2026. Some options are version-dependent. Check your installed Playwright version before using newer properties. Examples use <code>@playwright/test</code> with TypeScript.</div>
+
+<h2>1. The mental map</h2>
+<p>Imagine a Salesforce automation suite with hundreds of tests. You need to control test selection, execution speed, browser conditions, time limits, and failure evidence.</p>
+<div class="mental">
+<span class="step">Discover tests</span> → <span class="step">Configure run</span> → <span class="step">Create browser context</span> → <span class="step">Run tests</span> → <span class="step">Report evidence</span>
+</div>
+<div class="grid">
+<div class="tile"><b>TestConfig</b>Global test-runner settings in <code>playwright.config.ts</code>.</div>
+<div class="tile"><b>TestProject</b>A named execution configuration, e.g. Chromium or Firefox.</div>
+<div class="tile"><b>TestOptions / use</b>Browser and browser-context environment for tests.</div>
+<div class="tile"><b>Test API</b>Methods used in test files, e.g. <code>test.skip()</code> and <code>test.step()</code>.</div>
+<div class="tile"><b>CLI options</b>One-run overrides, e.g. <code>--workers=1</code>.</div>
+<div class="tile"><b>Fixtures and hooks</b>Provide test resources and setup/cleanup.</div>
+</div>
+<div class="callout warning"><b>Do not mix these categories.</b> <code>retries</code> is a test-runner configuration property. <code>test.skip()</code> is a test API annotation. <code>--retries=2</code> is a command-line option. They are related, but not the same type of thing.</div>
+
+<h2>2. Where configuration belongs</h2>
+<table><tr><th>Scope</th><th>Where</th><th>What it controls</th></tr>
+<tr><td>Global</td><td><code>playwright.config.ts</code></td><td>Defaults for the complete test run.</td></tr>
+<tr><td>Project</td><td><code>projects: [{ ... }]</code></td><td>One browser, device, environment or test group configuration.</td></tr>
+<tr><td>File / describe group</td><td><code>test.use()</code>, <code>test.describe.configure()</code></td><td>Supported fixture/options or execution mode for that scope.</td></tr>
+<tr><td>Individual test</td><td>Test details, modifiers, <code>test.setTimeout()</code></td><td>One test's metadata, behaviour or timeout.</td></tr>
+<tr><td>One command</td><td>CLI flags</td><td>Temporary override for that invocation.</td></tr></table>
+<p><b>Memory hook:</b> Global → Project → Group/File → Individual test. The exact override rules depend on the option; not every setting is overridable at every scope.</p>
+
+<h2>3. Test-runner configuration options (TestConfig)</h2>
+<h3>3.1 Test discovery</h3>
+<table><tr><th>Option</th><th>Meaning</th><th>Example / use</th></tr>
+<tr><td><code>testDir</code></td><td>Directory where Playwright searches for test files.</td><td><code>testDir: './tests'</code></td></tr>
+<tr><td><code>testMatch</code></td><td>File patterns considered test files.</td><td><code>testMatch: '**/*.spec.ts'</code></td></tr>
+<tr><td><code>testIgnore</code></td><td>File patterns excluded from discovery.</td><td><code>testIgnore: '**/legacy/**'</code></td></tr>
+<tr><td><code>grep</code></td><td>Run tests whose title/annotations match a regular expression.</td><td><code>grep: /@smoke/</code></td></tr>
+<tr><td><code>grepInvert</code></td><td>Exclude tests matching a regular expression.</td><td><code>grepInvert: /@slow/</code></td></tr>
+<tr><td><code>respectGitIgnore</code></td><td>Controls whether discovery respects .gitignore. Version-sensitive; documented as added in v1.45.</td><td>Check installed version and current docs.</td></tr></table>
+
+<h3>3.2 Execution, parallelism and retries</h3>
+<table><tr><th>Option</th><th>Meaning</th><th>Important detail</th></tr>
+<tr><td><code>workers</code></td><td>Maximum number of concurrent worker processes.</td><td>Each worker is an OS process and launches its own browser. More workers consume more CPU/memory.</td></tr>
+<tr><td><code>fullyParallel</code></td><td>Allows tests within files to run in parallel across workers.</td><td>Default behaviour: files can run in parallel; tests in one file run in order in one worker.</td></tr>
+<tr><td><code>retries</code></td><td>Maximum additional attempts for a failed test.</td><td>Default is 0. A pass after an initial failure is classified as flaky.</td></tr>
+<tr><td><code>retryStrategy</code></td><td>Controls when retries are scheduled.</td><td>Current docs: <code>immediate</code> (default) or <code>isolated</code>. Added in v1.62; verify version.</td></tr>
+<tr><td><code>repeatEach</code></td><td>Repeats each selected test the configured number of times.</td><td>Unlike retries, it repeats tests even when they pass.</td></tr>
+<tr><td><code>maxFailures</code></td><td>Stops the run after the specified number of test failures.</td><td>0 means no configured failure limit.</td></tr>
+<tr><td><code>globalTimeout</code></td><td>Maximum duration for the entire test run.</td><td>Default 0 (no global limit).</td></tr>
+<tr><td><code>forbidOnly</code></td><td>Fails the run if focused tests/groups are present.</td><td>Common CI protection: <code>forbidOnly: !!process.env.CI</code>.</td></tr>
+<tr><td><code>failOnFlakyTests</code></td><td>Can make the run fail if tests are classified as flaky.</td><td>Useful for enforcing CI quality; check installed version.</td></tr>
+</table>
+<pre><code>export default defineConfig({
+  workers: process.env.CI ? 2 : undefined,
+  fullyParallel: true,
+  retries: process.env.CI ? 2 : 0,
+  forbidOnly: !!process.env.CI,
+  maxFailures: process.env.CI ? 10 : 0
+});</code></pre>
+<div class="callout"><b>Workers vs fullyParallel</b><br>Workers = how many worker processes may run concurrently. fullyParallel = whether individual tests within a file are eligible to run in parallel too. Neither setting makes dependent tests safe. Keep tests independent.</div>
+<div class="callout"><b>Retries vs repeatEach</b><br>Retries only re-run failed tests. repeatEach repeats every selected test the specified number of times, including tests that passed.</div>
+
+<h3>3.3 Projects and sharding</h3>
+<p><b>projects</b> lets the same test suite run under different configurations: browser engines, branded browsers, devices, environments, or setup/teardown workflows.</p>
+<pre><code>projects: [
+  { name: 'chromium', use: { browserName: 'chromium' } },
+  { name: 'firefox',  use: { browserName: 'firefox' } },
+  { name: 'webkit',   use: { browserName: 'webkit' } }
+]</code></pre>
+<p><b>Sharding</b> splits a test suite across separate CI jobs/machines. Example CLI: <code>npx playwright test --shard=1/3</code>. Run the other shards as <code>--shard=2/3</code> and <code>--shard=3/3</code>. Workers are parallelism inside a run; shards distribute work across runs/jobs.</p>
+
+<h3>3.4 Reports and output</h3>
+<table><tr><th>Option</th><th>Meaning</th></tr>
+<tr><td><code>reporter</code></td><td>Reporter(s), e.g. list, line, dot, html, json, junit, github, blob.</td></tr>
+<tr><td><code>outputDir</code></td><td>Directory for test output and attachments, commonly <code>./test-results</code>.</td></tr>
+<tr><td><code>metadata</code></td><td>Custom metadata attached to the run/report.</td></tr>
+<tr><td><code>reportSlowTests</code></td><td>Configures reporting of slow tests.</td></tr>
+<tr><td><code>preserveOutput</code></td><td>Controls when test output directories are cleaned/preserved.</td></tr>
+<tr><td><code>quiet</code></td><td>Controls standard test output verbosity.</td></tr>
+<tr><td><code>list</code></td><td>Lists discovered tests instead of running them.</td></tr></table>
+<pre><code>reporter: [
+  ['list'],
+  ['html', { open: 'never' }],
+  ['junit', { outputFile: 'results.xml' }]
+],
+outputDir: './test-results'</code></pre>
+
+<h3>3.5 Setup, teardown and local server</h3>
+<table><tr><th>Option</th><th>Meaning</th></tr>
+<tr><td><code>globalSetup</code></td><td>Runs setup code before the test run.</td></tr>
+<tr><td><code>globalTeardown</code></td><td>Runs cleanup code after the test run.</td></tr>
+<tr><td><code>webServer</code></td><td>Starts a local server and waits for its URL to become available.</td></tr>
+<tr><td>Project <code>dependencies</code></td><td>Runs prerequisite projects before dependent projects.</td></tr>
+<tr><td>Project <code>teardown</code></td><td>Associates a teardown project with a setup project.</td></tr></table>
+<pre><code>webServer: {
+  command: 'npm run start',
+  url: 'http://localhost:3000',
+  reuseExistingServer: !process.env.CI
+}</code></pre>
+<p>For setup that should appear in Playwright's project/report lifecycle, consider a setup project with project dependencies. Use global setup/teardown when the work is truly global and does not need to be represented as a test project.</p>
+
+<h2>4. Browser and context options (the use object)</h2>
+<p>These options configure the browser launch or the BrowserContext used by Playwright Test. The exact underlying destination matters: some settings are launch options; many are context settings.</p>
+<h3>4.1 Browser selection and launch</h3>
+<table><tr><th>Option</th><th>Meaning</th></tr>
+<tr><td><code>browserName</code></td><td>Browser engine: chromium, firefox or webkit. Test runner default is chromium.</td></tr>
+<tr><td><code>channel</code></td><td>Branded browser channel, e.g. Chrome or Edge where supported.</td></tr>
+<tr><td><code>headless</code></td><td>Whether browser UI is hidden. Default true in standard Playwright Test configuration.</td></tr>
+<tr><td><code>launchOptions</code></td><td>Options passed to browserType.launch(), such as supported launch flags/settings.</td></tr>
+<tr><td><code>connectOptions</code></td><td>Options for connecting to a browser server, when using a remote connection.</td></tr>
+<tr><td><code>contextOptions</code></td><td>BrowserContext creation options grouped under this property.</td></tr></table>
+<p>Do not confuse <code>browserName: 'chromium'</code> (engine) with <code>channel: 'chrome'</code> (branded distribution).</p>
+<h3>4.2 Viewport and device emulation</h3>
+<table><tr><th>Option</th><th>Meaning</th></tr>
+<tr><td><code>viewport</code></td><td>Page viewport width and height.</td></tr>
+<tr><td><code>screen</code></td><td>Emulated screen dimensions; used with device emulation settings.</td></tr>
+<tr><td><code>deviceScaleFactor</code></td><td>Device pixel ratio.</td></tr>
+<tr><td><code>isMobile</code></td><td>Enables mobile browser emulation behaviour where supported.</td></tr>
+<tr><td><code>hasTouch</code></td><td>Enables touch support.</td></tr>
+<tr><td><code>userAgent</code></td><td>Overrides browser user-agent string.</td></tr></table>
+<pre><code>import { defineConfig, devices } from '@playwright/test';
+
+export default defineConfig({
+  projects: [{
+    name: 'mobile-chromium',
+    use: { ...devices['Pixel 7'] }
+  }]
+});</code></pre>
+<p>Device emulation is not the same as testing on a physical phone. It emulates browser/device characteristics.</p>
+
+<h3>4.3 URL and authentication</h3>
+<table><tr><th>Option</th><th>Meaning</th></tr>
+<tr><td><code>baseURL</code></td><td>Base URL used to resolve relative navigation such as <code>page.goto('/accounts')</code>.</td></tr>
+<tr><td><code>storageState</code></td><td>Loads saved cookies and supported browser storage into a context; commonly used for authenticated tests.</td></tr></table>
+<pre><code>use: {
+  baseURL: process.env.BASE_URL,
+  storageState: 'playwright/.auth/user.json'
+}</code></pre>
+<div class="callout warning"><b>Security:</b> Authentication state files can contain credentials/session tokens. Keep them out of public repositories and protect them in CI. Storage state is not a complete copy of every browser storage mechanism; sessionStorage needs separate handling.</div>
+
+<h3>4.4 Locale, time and permissions</h3>
+<table><tr><th>Option</th><th>Meaning</th></tr>
+<tr><td><code>locale</code></td><td>Browser locale and regional formatting preferences.</td></tr>
+<tr><td><code>timezoneId</code></td><td>Browser timezone.</td></tr>
+<tr><td><code>geolocation</code></td><td>Simulated latitude/longitude.</td></tr>
+<tr><td><code>permissions</code></td><td>Grant browser permissions, e.g. geolocation or notifications where supported.</td></tr>
+<tr><td><code>colorScheme</code></td><td>Emulates light/dark preference.</td></tr>
+<tr><td><code>reducedMotion</code></td><td>Emulates reduced-motion preference.</td></tr>
+<tr><td><code>forcedColors</code></td><td>Emulates forced-colours preference.</td></tr></table>
+<pre><code>use: {
+  locale: 'en-GB',
+  timezoneId: 'Europe/London',
+  colorScheme: 'dark',
+  geolocation: { latitude: 51.5072, longitude: -0.1276 },
+  permissions: ['geolocation']
+}</code></pre>
+
+<h3>4.5 Network, security and service workers</h3>
+<table><tr><th>Option</th><th>Meaning / caution</th></tr>
+<tr><td><code>offline</code></td><td>Emulates offline network state.</td></tr>
+<tr><td><code>proxy</code></td><td>Configures a proxy for browser traffic.</td></tr>
+<tr><td><code>extraHTTPHeaders</code></td><td>Additional HTTP headers sent with requests.</td></tr>
+<tr><td><code>httpCredentials</code></td><td>HTTP authentication credentials (not the same as app login).</td></tr>
+<tr><td><code>ignoreHTTPSErrors</code></td><td>Ignores HTTPS certificate errors; use only when the test environment requires it.</td></tr>
+<tr><td><code>clientCertificates</code></td><td>Configures client certificates for mutual TLS scenarios.</td></tr>
+<tr><td><code>serviceWorkers</code></td><td>Controls service-worker handling, e.g. allow or block.</td></tr>
+<tr><td><code>bypassCSP</code></td><td>Bypasses Content Security Policy; generally not a normal production-like test setting.</td></tr></table>
+
+<h3>4.6 Downloads, dialogs and test IDs</h3>
+<table><tr><th>Option</th><th>Meaning</th></tr>
+<tr><td><code>acceptDownloads</code></td><td>Whether downloads are accepted automatically. Current API docs list default true.</td></tr>
+<tr><td><code>testIdAttribute</code></td><td>Changes the attribute used by <code>getByTestId()</code>; default is <code>data-testid</code>.</td></tr>
+<tr><td><code>javaScriptEnabled</code></td><td>Enables/disables JavaScript in the context; default true.</td></tr>
+<tr><td><code>httpCredentials</code></td><td>Sets HTTP authentication credentials.</td></tr></table>
+
+<h3>4.7 Screenshot, video and trace</h3>
+<table><tr><th>Setting</th><th>Common values</th><th>Meaning</th></tr>
+<tr><td><code>screenshot</code></td><td><code>off</code>, <code>on</code>, <code>only-on-failure</code></td><td>Automatic screenshot capture.</td></tr>
+<tr><td><code>video</code></td><td><code>off</code>, <code>on</code>, <code>retain-on-failure</code>, <code>on-first-retry</code></td><td>Video recording and retention policy.</td></tr>
+<tr><td><code>trace</code></td><td><code>off</code>, <code>on</code>, <code>retain-on-failure</code>, <code>on-first-retry</code>, <code>retain-on-first-failure</code></td><td>Detailed execution trace and retention policy.</td></tr></table>
+<p><b>Practical CI choice:</b> <code>screenshot: 'only-on-failure'</code>, <code>video: 'retain-on-failure'</code>, <code>trace: 'on-first-retry'</code>. This is a starting point, not a universal rule. Trace Viewer can show actions, snapshots, network activity and timing information.</p>
+
+<h2>5. Test API methods and modifiers</h2>
+<table><tr><th>Method</th><th>What it does</th><th>Remember</th></tr>
+<tr><td><code>test.skip()</code></td><td>Marks a test as irrelevant/not to be run.</td><td>Conditional skip is useful for browser-specific limitations.</td></tr>
+<tr><td><code>test.only()</code></td><td>Focuses execution on selected tests.</td><td>Protect CI with <code>forbidOnly</code>.</td></tr>
+<tr><td><code>test.fail()</code></td><td>Runs the test but expects it to fail.</td><td>If it passes, Playwright reports an unexpected pass/failure.</td></tr>
+<tr><td><code>test.fixme()</code></td><td>Marks test for fixing and does not run it.</td><td>Use for known broken/unfinished tests.</td></tr>
+<tr><td><code>test.slow()</code></td><td>Triples the test timeout.</td><td>Does not slow the test down; increases its allowed time.</td></tr>
+<tr><td><code>test.describe()</code></td><td>Groups tests and scopes hooks/configuration.</td><td>Think of a logical test suite/module.</td></tr>
+<tr><td><code>test.describe.configure()</code></td><td>Sets group execution mode: default, parallel or serial.</td><td>Serial mode has failure/skip implications; prefer independent tests.</td></tr>
+<tr><td><code>test.use()</code></td><td>Overrides supported fixtures/options for a file or describe scope.</td><td>Not a way to change browser options halfway through a running test.</td></tr>
+<tr><td><code>test.setTimeout()</code></td><td>Changes timeout for a test or relevant hook scope.</td><td>Use milliseconds.</td></tr>
+<tr><td><code>test.step()</code></td><td>Creates named steps in the report.</td><td>Improves readability and failure diagnosis.</td></tr>
+<tr><td><code>test.info()</code></td><td>Provides information about the currently running test.</td><td>Can access attachments, annotations, status and test metadata.</td></tr></table>
+<pre><code>test.describe('Salesforce Account tests', () => {
+  test.beforeEach(async ({ page }) => {
+    await page.goto('/accounts');
+  });
+
+  test('Create account @smoke', async ({ page }) => {
+    await test.step('Open new account form', async () => {
+      await page.getByRole('button', { name: 'New' }).click();
+    });
+
+    await test.step('Verify form is visible', async () => {
+      await expect(page.getByRole('heading', { name: 'New Account' }))
+        .toBeVisible();
+    });
+  });
+});</code></pre>
+<p><b>Execution modes:</b> <code>default</code> is the normal mode; <code>parallel</code> runs tests in the group in separate worker processes; <code>serial</code> runs in order and subsequent tests are skipped if a test in the serial group fails. Serial mode is generally discouraged because it creates dependencies between tests.</p>
+
+<h2>6. Timeout options — do not confuse them</h2>
+<table><tr><th>Timeout</th><th>Controls</th><th>Default</th><th>Configured at</th></tr>
+<tr><td>Test timeout</td><td>Test function, fixture setup and beforeEach time.</td><td>30,000 ms</td><td><code>timeout</code></td></tr>
+<tr><td>Expect timeout</td><td>Auto-retrying assertion wait.</td><td>5,000 ms</td><td><code>expect.timeout</code> or assertion option</td></tr>
+<tr><td>Action timeout</td><td>Individual action such as click/fill.</td><td>0 (no limit)</td><td><code>use.actionTimeout</code></td></tr>
+<tr><td>Navigation timeout</td><td>Navigation actions.</td><td>0 (no limit)</td><td><code>use.navigationTimeout</code></td></tr>
+<tr><td>Global timeout</td><td>Whole test run.</td><td>0 (no limit)</td><td><code>globalTimeout</code></td></tr>
+<tr><td>Hook timeout</td><td>beforeAll/afterAll hooks.</td><td>Defaults to test timeout</td><td><code>test.setTimeout()</code> / testInfo timeout in hook</td></tr></table>
+<div class="callout warning"><b>Subtle but important:</b> The test timeout includes the test function, fixture setup and beforeEach. Fixture teardown and afterEach have a separate timeout budget of the same value. beforeAll/afterAll have their own timeout budget. Assertion timeout is separate from test timeout.</div>
+<pre><code>export default defineConfig({
+  timeout: 60_000,
+  expect: { timeout: 10_000 },
+  use: {
+    actionTimeout: 15_000,
+    navigationTimeout: 20_000
+  },
+  globalTimeout: 3_600_000
+});</code></pre>
+<p>For one test: <code>test.setTimeout(60_000)</code>. For one assertion: <code>await expect(locator).toBeVisible({ timeout: 10_000 })</code>. For one action: <code>await locator.click({ timeout: 8_000 })</code>.</p>
+
+<h2>7. Tags and annotations</h2>
+<p>Tags classify tests; annotations attach additional information. Tags must start with <code>@</code>.</p>
+<pre><code>test('Create account', {
+  tag: ['@smoke', '@regression'],
+  annotation: {
+    type: 'requirement',
+    description: 'CRM-101'
+  }
+}, async ({ page }) => {
+  // test steps
+});</code></pre>
+<pre><code>npx playwright test --grep "@smoke"
+npx playwright test --grep-invert "@slow"
+npx playwright test --grep "@smoke|@regression"</code></pre>
+<p>Use regex lookaheads if you need tests carrying both tags: <code>--grep "(?=.*@smoke)(?=.*@regression)"</code>.</p>
+
+<h2>8. Hooks and lifecycle</h2>
+<table><tr><th>Hook</th><th>When</th><th>Typical use</th></tr>
+<tr><td><code>test.beforeAll()</code></td><td>Before tests in its scope in a worker.</td><td>Worker-level preparation.</td></tr>
+<tr><td><code>test.beforeEach()</code></td><td>Before each test.</td><td>Navigate to page, create per-test setup.</td></tr>
+<tr><td><code>test.afterEach()</code></td><td>After each test.</td><td>Per-test cleanup.</td></tr>
+<tr><td><code>test.afterAll()</code></td><td>After tests in its scope in a worker.</td><td>Worker-level cleanup.</td></tr></table>
+<p>Important: beforeAll/afterAll are not guaranteed to run just once for the entire CI pipeline. Parallel workers have their own execution scopes. Tests should normally be isolated and independently set up.</p>
+
+<h2>9. CLI commands you should know</h2>
+<table><tr><th>Command</th><th>Purpose</th></tr>
+<tr><td><code>npx playwright test</code></td><td>Run discovered tests.</td></tr>
+<tr><td><code>npx playwright test login.spec.ts</code></td><td>Run a specific file.</td></tr>
+<tr><td><code>npx playwright test --headed</code></td><td>Run with visible browser UI.</td></tr>
+<tr><td><code>npx playwright test --debug</code></td><td>Run in debug mode.</td></tr>
+<tr><td><code>npx playwright test --ui</code></td><td>Open UI mode.</td></tr>
+<tr><td><code>npx playwright test --project=chromium</code></td><td>Run one project.</td></tr>
+<tr><td><code>npx playwright test --workers=1</code></td><td>Limit to one worker.</td></tr>
+<tr><td><code>npx playwright test --retries=2</code></td><td>Override retries for this run.</td></tr>
+<tr><td><code>npx playwright test --grep="@smoke"</code></td><td>Run matching tests.</td></tr>
+<tr><td><code>npx playwright test --last-failed</code></td><td>Run tests that failed in the previous run, where supported by stored state.</td></tr>
+<tr><td><code>npx playwright test --list</code></td><td>List tests without running them.</td></tr>
+<tr><td><code>npx playwright show-report</code></td><td>Open the HTML report.</td></tr>
+<tr><td><code>npx playwright test --shard=1/3</code></td><td>Run one shard of a distributed suite.</td></tr></table>
+
+<h2>10. A practical starter configuration</h2>
+<p>This is a learning template, not a one-size-fits-all production configuration. Set <code>BASE_URL</code> in your environment. Start with fewer workers in CI if the agent has limited resources.</p>
+<pre><code>import { defineConfig, devices } from '@playwright/test';
+
+export default defineConfig({
+  testDir: './tests',
+  testMatch: '**/*.spec.ts',
+
+  timeout: 30_000,
+  expect: { timeout: 5_000 },
+
+  retries: process.env.CI ? 2 : 0,
+  workers: process.env.CI ? 2 : undefined,
+  fullyParallel: true,
+  forbidOnly: !!process.env.CI,
+
+  reporter: [
+    ['list'],
+    ['html', { open: 'never' }]
+  ],
+  outputDir: './test-results',
+
+  use: {
+    baseURL: process.env.BASE_URL,
+    headless: !!process.env.CI,
+    actionTimeout: 10_000,
+    navigationTimeout: 20_000,
+    screenshot: 'only-on-failure',
+    video: 'retain-on-failure',
+    trace: 'on-first-retry'
+  },
+
+  projects: [
+    { name: 'chromium', use: { ...devices['Desktop Chrome'] } },
+    { name: 'firefox', use: { ...devices['Desktop Firefox'] } },
+    { name: 'webkit', use: { ...devices['Desktop Safari'] } }
+  ]
+});</code></pre>
+<div class="callout warning"><b>Configuration note:</b> Project-level <code>use</code> values can override corresponding top-level <code>use</code> values. In the example, device descriptors may provide their own viewport/device settings. Review the resolved project configuration rather than assuming every global setting wins.</div>
+
+<h2>11. Common mistakes to avoid</h2>
+<ol>
+<li>Putting runner settings such as <code>retries</code> or <code>workers</code> inside <code>use</code>. They belong at the test-config/project level, not in browser context options.</li>
+<li>Leaving <code>test.only()</code> in a shared branch. Enable <code>forbidOnly</code> in CI.</li>
+<li>Increasing timeouts to hide poor synchronization. Prefer Playwright auto-waiting and reliable locators.</li>
+<li>Increasing workers without checking CPU, memory, test data collisions and environment capacity.</li>
+<li>Using retries to hide product defects or unstable tests instead of investigating root causes.</li>
+<li>Making tests depend on the order of other tests. Prefer independent setup and cleanup.</li>
+<li>Assuming <code>storageState</code> saves every kind of browser storage. Session storage needs separate handling.</li>
+<li>Confusing browser engine (<code>browserName</code>) with branded browser channel (<code>channel</code>).</li>
+<li>Assuming <code>test.slow()</code> slows the test. It triples the timeout.</li>
+<li>Assuming a worker is a browser tab. A worker is an operating-system process; it launches its own browser.</li>
+</ol>
+
+<h2>12. Interview questions with short answers</h2>
+<div class="qa"><b>1. What is the difference between TestConfig and TestOptions?</b><div class="answer">TestConfig controls test discovery and the test run. TestOptions configure the browser/browser-context environment used by tests, usually under use.</div></div>
+<div class="qa"><b>2. What is the difference between workers and fullyParallel?</b><div class="answer">Workers set the maximum concurrent worker processes. fullyParallel allows tests within a file to run in parallel too.</div></div>
+<div class="qa"><b>3. What is the difference between retries and repeatEach?</b><div class="answer">Retries re-run failed tests. repeatEach repeats every selected test, whether it passes or fails.</div></div>
+<div class="qa"><b>4. What is a flaky test?</b><div class="answer">A test that fails on its initial run but passes on a retry.</div></div>
+<div class="qa"><b>5. Why use forbidOnly?</b><div class="answer">To prevent accidental focused tests from silently reducing the CI run to only a subset.</div></div>
+<div class="qa"><b>6. What is the difference between timeout and expect.timeout?</b><div class="answer">Test timeout controls the test's execution budget. expect.timeout controls how long an auto-retrying assertion waits.</div></div>
+<div class="qa"><b>7. What is globalTimeout?</b><div class="answer">A time limit for the complete test run, not one individual test.</div></div>
+<div class="qa"><b>8. What does test.slow() do?</b><div class="answer">It marks the test as slow and triples its test timeout. It does not intentionally slow execution.</div></div>
+<div class="qa"><b>9. Difference between skip, fixme and fail?</b><div class="answer">skip does not run a test; fixme marks it as needing a fix and does not run it; fail runs it and expects it to fail.</div></div>
+<div class="qa"><b>10. What is test.use()?</b><div class="answer">It overrides supported fixtures/options for a test file or describe group. It is not a mid-test browser reconfiguration API.</div></div>
+<div class="qa"><b>11. What is the difference between browserName and channel?</b><div class="answer">browserName selects the browser engine; channel selects a branded browser distribution such as Chrome or Edge.</div></div>
+<div class="qa"><b>12. What is storageState used for?</b><div class="answer">To load saved cookies and supported browser storage, commonly to reuse authentication state.</div></div>
+<div class="qa"><b>13. Does storageState save sessionStorage automatically?</b><div class="answer">No. Session storage requires separate handling.</div></div>
+<div class="qa"><b>14. What is the difference between a project and a worker?</b><div class="answer">A project is a named test configuration. A worker is an OS process that executes tests.</div></div>
+<div class="qa"><b>15. What is sharding?</b><div class="answer">Splitting the test suite into parts that can run in separate CI jobs or machines.</div></div>
+<div class="qa"><b>16. What is the difference between screenshot, video and trace?</b><div class="answer">Screenshot is a still image; video records visual execution; trace provides detailed debugging data such as actions, snapshots, network and timing.</div></div>
+<div class="qa"><b>17. Why are independent tests important?</b><div class="answer">They can run in any order and in parallel without relying on another test's state or data.</div></div>
+<div class="qa"><b>18. What is test.describe.configure({ mode: 'serial' })?</b><div class="answer">It runs tests in order and skips subsequent tests in that serial group after a failure. Serial mode is generally discouraged because it creates dependencies.</div></div>
+<div class="qa"><b>19. What does webServer do?</b><div class="answer">It starts a local application/server command and waits for the configured URL before tests run.</div></div>
+<div class="qa"><b>20. When would you use projects?</b><div class="answer">To run the same tests with different browsers, devices, environments or setup dependencies.</div></div>
+<div class="qa"><b>21. What happens when a test times out?</b><div class="answer">Playwright marks it as timed out. Investigate the operation, fixture, hook or assertion that consumed the available time.</div></div>
+<div class="qa"><b>22. Should you increase actionTimeout for every test?</b><div class="answer">Not automatically. First investigate locator quality, application response, synchronization and network conditions. A larger timeout can hide the real issue.</div></div>
+<div class="qa"><b>23. What is the difference between beforeAll and beforeEach?</b><div class="answer">beforeAll runs once per relevant worker/scope; beforeEach runs before each test. Do not assume beforeAll runs once across the whole CI pipeline.</div></div>
+<div class="qa"><b>24. Why might you use failOnFlakyTests?</b><div class="answer">To make CI reject flaky outcomes instead of treating a retry-passed test as acceptable.</div></div>
+<div class="qa"><b>25. What is retryStrategy?</b><div class="answer">A newer option controlling when failed tests are retried: immediate or isolated. It is documented as introduced in v1.62, so verify the installed version.</div></div>
+
+<h2>13. Practical assignments</h2>
+<ol>
+<li>Create five tests and practise unconditional and conditional <code>test.skip()</code>.</li>
+<li>Use <code>test.only()</code>, then enable <code>forbidOnly</code> and confirm the protection.</li>
+<li>Use <code>test.fail()</code> with a deliberately incorrect expected result; observe the outcome.</li>
+<li>Use <code>test.fixme()</code> and compare it with skip.</li>
+<li>Use <code>test.slow()</code> and <code>test.setTimeout()</code>; explain the difference.</li>
+<li>Group Account tests with <code>test.describe()</code> and add <code>test.step()</code>.</li>
+<li>Use <code>test.use()</code> to set a different locale or viewport for one group.</li>
+<li>Configure retries and deliberately create a temporary flaky test to observe passed/flaky/failed outcomes.</li>
+<li>Run with 1, 2 and 4 workers. Observe execution time and resource usage.</li>
+<li>Compare normal file execution with <code>fullyParallel: true</code>.</li>
+<li>Create Chromium, Firefox and WebKit projects.</li>
+<li>Configure screenshot, video and trace policies; inspect a trace in Trace Viewer.</li>
+<li>Add smoke/regression tags and filter with <code>--grep</code> and <code>--grep-invert</code>.</li>
+<li>Run a three-shard suite using three CI jobs or local commands.</li>
+<li>Configure <code>webServer</code> for a local test application.</li>
+<li>Prepare a CI configuration with retries, worker limits, reports and failure artifacts.</li>
+</ol>
+
+<h2>14. One-page revision map</h2>
+<div class="mental">
+<p><b>DISCOVERY</b> → testDir, testMatch, testIgnore, grep, grepInvert</p>
+<p><b>EXECUTION</b> → workers, fullyParallel, retries, retryStrategy, repeatEach, maxFailures, globalTimeout</p>
+<p><b>PROTECTION</b> → forbidOnly, failOnFlakyTests</p>
+<p><b>PROJECTS / CI</b> → projects, dependencies, teardown, shard, webServer</p>
+<p><b>BROWSER</b> → browserName, channel, headless, launchOptions</p>
+<p><b>CONTEXT</b> → viewport, locale, timezoneId, storageState, baseURL, permissions, network options</p>
+<p><b>DEBUGGING</b> → screenshot, video, trace</p>
+<p><b>TEST API</b> → skip, only, fail, fixme, slow, describe, configure, use, setTimeout, step</p>
+<p><b>REPORTING</b> → reporter, outputDir, metadata, reportSlowTests</p>
+</div>
+
+<h2>15. Official references</h2>
+<ul>
+<li><a href="https://playwright.dev/docs/test-configuration" target="_blank" rel="noopener">Playwright Test Configuration</a></li>
+<li><a href="https://playwright.dev/docs/test-use-options" target="_blank" rel="noopener">Configuration: use options</a></li>
+<li><a href="https://playwright.dev/docs/api/class-testconfig" target="_blank" rel="noopener">TestConfig API</a></li>
+<li><a href="https://playwright.dev/docs/api/class-testoptions" target="_blank" rel="noopener">TestOptions API</a></li>
+<li><a href="https://playwright.dev/docs/api/class-test" target="_blank" rel="noopener">Test API</a></li>
+<li><a href="https://playwright.dev/docs/test-annotations" target="_blank" rel="noopener">Annotations and tags</a></li>
+<li><a href="https://playwright.dev/docs/test-timeouts" target="_blank" rel="noopener">Timeouts</a></li>
+<li><a href="https://playwright.dev/docs/test-parallel" target="_blank" rel="noopener">Parallelism</a></li>
+<li><a href="https://playwright.dev/docs/test-retries" target="_blank" rel="noopener">Retries</a></li>
+<li><a href="https://playwright.dev/docs/test-projects" target="_blank" rel="noopener">Projects</a></li>
+<li><a href="https://playwright.dev/docs/test-reporters" target="_blank" rel="noopener">Reporters</a></li>
+<li><a href="https://playwright.dev/docs/test-sharding" target="_blank" rel="noopener">Sharding</a></li>
+<li><a href="https://playwright.dev/docs/test-global-setup-teardown" target="_blank" rel="noopener">Global setup and teardown</a></li>
+</ul>
+<div class="footer">
+<b>Trainer's learning advice:</b> Do not memorize every property in one sitting. Learn the mental map first, implement one category at a time, and explain why you selected an option. In interviews, a correct practical reason is stronger than reciting a property name.<br><br>
+Prepared as a learning handbook for Playwright with TypeScript. Documentation links point to the official Playwright site; APIs can change across releases. Check your project's installed version before adopting newer options.
+</div>
+</article></main></body></html>
